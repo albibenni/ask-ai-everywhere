@@ -5,6 +5,47 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	accentColor = lipgloss.AdaptiveColor{Light: "#5A38B5", Dark: "#C4A7FF"}
+	mutedColor  = lipgloss.AdaptiveColor{Light: "#6B6673", Dark: "#928B9D"}
+	textColor   = lipgloss.AdaptiveColor{Light: "#221D29", Dark: "#F3EDF7"}
+
+	pickerTitleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(accentColor)
+	pickerCurrentStyle = lipgloss.NewStyle().
+				Foreground(mutedColor)
+	pickerPanelStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(accentColor).
+				Padding(0, 1).
+				Width(32)
+	pickerRowStyle = lipgloss.NewStyle().
+			Foreground(textColor).
+			Padding(0, 1).
+			Width(28)
+	pickerSelectedStyle = pickerRowStyle.Copy().
+				Bold(true).
+				Foreground(lipgloss.AdaptiveColor{Light: "#FFFFFF", Dark: "#21182B"}).
+				Background(accentColor)
+	pickerBadgeStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(accentColor)
+	pickerHelpStyle = lipgloss.NewStyle().
+			Foreground(mutedColor)
+	pickerInputStyle = lipgloss.NewStyle().
+				Foreground(textColor).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(accentColor).
+				Padding(0, 1).
+				Width(42)
+	pickerCursorStyle = lipgloss.NewStyle().
+				Foreground(accentColor)
+	pickerContainerStyle = lipgloss.NewStyle().
+				Margin(1, 2)
 )
 
 type providerOption struct {
@@ -109,25 +150,44 @@ func (m providerPickerModel) updateCustomURL(key tea.KeyMsg) (tea.Model, tea.Cmd
 
 func (m providerPickerModel) View() string {
 	if m.enteringCustom {
-		return fmt.Sprintf(
-			"Choose AI provider\n\nCustom HTTPS URL\n> %s\n\nenter save • esc back • ctrl+c cancel\n",
-			m.customURL,
-		)
+		input := pickerInputStyle.Render(m.customURL + pickerCursorStyle.Render("█"))
+		content := strings.Join([]string{
+			pickerTitleStyle.Render("Choose AI provider"),
+			pickerCurrentStyle.Render("Custom HTTPS URL"),
+			input,
+			pickerHelpStyle.Render("enter save  •  esc back  •  ctrl+c cancel"),
+		}, "\n\n")
+		return pickerContainerStyle.Render(content) + "\n"
 	}
 
-	var view strings.Builder
-	fmt.Fprintf(&view, "Choose AI provider\nCurrent: %s\n\n", m.current)
+	var rows strings.Builder
 	for index, option := range providerOptions {
 		cursor := "  "
 		if index == m.cursor {
-			cursor = "> "
+			cursor = "› "
 		}
 		current := ""
 		if option.provider == m.current {
-			current = " (current)"
+			current = "  ● current"
+			if index != m.cursor {
+				current = "  " + pickerBadgeStyle.Render("● current")
+			}
 		}
-		fmt.Fprintf(&view, "%s%s%s\n", cursor, option.label, current)
+		row := cursor + option.label + current
+		if index == m.cursor {
+			row = pickerSelectedStyle.Render(row)
+		} else {
+			row = pickerRowStyle.Render(row)
+		}
+		rows.WriteString(row)
+		rows.WriteByte('\n')
 	}
-	view.WriteString("\n↑/k up • ↓/j down • enter select • esc/q cancel\n")
-	return view.String()
+
+	content := strings.Join([]string{
+		pickerTitleStyle.Render("Choose AI provider"),
+		pickerCurrentStyle.Render(fmt.Sprintf("Current: %s", m.current)),
+		pickerPanelStyle.Render(strings.TrimSuffix(rows.String(), "\n")),
+		pickerHelpStyle.Render("↑/k up  •  ↓/j down  •  enter select  •  esc/q cancel"),
+	}, "\n")
+	return pickerContainerStyle.Render(content) + "\n"
 }
