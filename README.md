@@ -88,17 +88,37 @@ Confirm the installation:
 $HOME/.local/bin/ask-ai -version
 ```
 
-The development build reports `dev`. Set `VERSION` for a versioned build:
+Build versions are derived from Git. A tagged commit reports its release tag;
+other commits report their abbreviated commit hash, with `-dirty` appended when
+the working tree has changes. Inspect the value before building with:
 
 ```sh
-make build VERSION=1.0.0
+make version
+```
+
+`make install` uses that value automatically. `VERSION` remains available as an
+explicit override when needed:
+
+```sh
+make build VERSION=v1.0.0
 ```
 
 Build Linux and macOS binaries for Intel and ARM:
 
 ```sh
-make cross-build VERSION=1.0.0
+make cross-build VERSION=v1.0.0
 ```
+
+Create a release from a clean `main` branch:
+
+```sh
+make release
+```
+
+The release command suggests the next patch version, prompts for a semantic
+version and confirmation, runs the test/vet suite and all cross-builds, creates
+an annotated Git tag, then atomically pushes `main` and the tag to `origin`.
+Afterward, a plain `make install` embeds that tag in the installed binary.
 
 Run `make help` for formatting, testing, vetting, building, installation, and
 cleanup commands. Override `INSTALL_PREFIX` when `~/.local` is not the desired

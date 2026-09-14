@@ -3,15 +3,18 @@ COMMAND := ./cmd/ask-ai
 BUILD_DIR := bin
 INSTALL_PREFIX ?= $(HOME)/.local
 COMPLETION_DIR ?= $(INSTALL_PREFIX)/share/bash-completion/completions
-VERSION ?= dev
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GO_LDFLAGS := -X main.version=$(VERSION)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt test vet check build completion install cross-build clean
+.PHONY: help version fmt test vet check build completion install cross-build release clean
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+version: ## Show the version that would be embedded in a build
+	@printf '%s\n' '$(VERSION)'
 
 fmt: ## Format all Go source files
 	gofmt -w cmd internal
@@ -45,6 +48,9 @@ cross-build: ## Build Linux and macOS release binaries
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-arm64 $(COMMAND)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-amd64 $(COMMAND)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-arm64 $(COMMAND)
+
+release: ## Prompt for a version, verify, tag, and push a release
+	@./scripts/release.sh
 
 clean: ## Remove generated binaries
 	rm -rf $(BUILD_DIR)
