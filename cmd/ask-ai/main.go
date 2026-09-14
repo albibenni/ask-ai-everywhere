@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"ask-ai-everywhere/internal/askai"
 	"ask-ai-everywhere/internal/desktop"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var version = "dev"
@@ -137,51 +136,29 @@ func promptForProvider(configPath string, input io.Reader, output, errorOutput i
 		fmt.Fprintln(errorOutput, "ask-ai provider:", err)
 		return 1
 	}
-	fmt.Fprintf(output, `Current provider: %s
-Choose provider:
-  1) ChatGPT
-  2) Claude
-  3) Gemini
-  4) Kimi
-  5) Custom URL
-Selection [keep current]: `, config.Provider)
-
-	scanner := bufio.NewScanner(input)
-	if !scanner.Scan() {
-		fmt.Fprintln(errorOutput, "ask-ai provider: no selection received")
-		return 1
-	}
-	choice := strings.ToLower(strings.TrimSpace(scanner.Text()))
-	if choice == "" {
-		fmt.Fprintf(output, "Provider unchanged: %s\n", config.Provider)
-		return 0
-	}
-	providers := map[string]string{
-		"1": "chatgpt", "chatgpt": "chatgpt",
-		"2": "claude", "claude": "claude",
-		"3": "gemini", "gemini": "gemini",
-		"4": "kimi", "kimi": "kimi",
-		"5": "custom", "custom": "custom",
-	}
-	provider, ok := providers[choice]
-	if !ok {
-		fmt.Fprintf(errorOutput, "ask-ai provider: invalid selection %q\n", choice)
-		return 2
-	}
-
-	customURL := ""
-	if provider == "custom" {
-		fmt.Fprint(output, "Custom HTTPS URL: ")
-		if !scanner.Scan() {
-			fmt.Fprintln(errorOutput, "ask-ai provider: no custom URL received")
-			return 1
-		}
-		customURL = strings.TrimSpace(scanner.Text())
-	}
-	if err := askai.SetProvider(configPath, provider, customURL); err != nil {
+	program := tea.NewProgram(
+		newProviderPicker(config.Provider, config.URL),
+		tea.WithInput(input),
+		tea.WithOutput(output),
+	)
+	result, err := program.Run()
+	if err != nil {
 		fmt.Fprintln(errorOutput, "ask-ai provider:", err)
 		return 1
 	}
-	fmt.Fprintf(output, "Provider set to %s\n", provider)
+	model, ok := result.(providerPickerModel)
+	if !ok {
+		fmt.Fprintln(errorOutput, "ask-ai provider: picker returned an unexpected result")
+		return 1
+	}
+	if model.cancelled || model.selection.Provider == "" {
+		fmt.Fprintf(output, "Provider unchanged: %s\n", config.Provider)
+		return 0
+	}
+	if err := askai.SetProvider(configPath, model.selection.Provider, model.selection.CustomURL); err != nil {
+		fmt.Fprintln(errorOutput, "ask-ai provider:", err)
+		return 1
+	}
+	fmt.Fprintf(output, "Provider set to %s\n", model.selection.Provider)
 	return 0
 }

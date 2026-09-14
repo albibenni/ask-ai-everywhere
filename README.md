@@ -142,8 +142,11 @@ Open the interactive provider picker:
 ask-ai provider
 ```
 
-It shows the current provider and prompts for ChatGPT, Claude, Gemini, Kimi, or
-a custom HTTPS URL. Press Enter without choosing to keep the current provider.
+The Bubble Tea picker shows the current provider and lets you choose ChatGPT,
+Claude, Gemini, Kimi, or a custom HTTPS URL. Use the arrow keys or `j`/`k` to
+move and Enter to select. Press Esc, `q`, or Ctrl-C to keep the current provider.
+Choosing Custom URL opens its HTTPS URL editor inside the same TUI; Enter saves
+it and Esc returns to the provider list.
 
 Print the current provider non-interactively:
 

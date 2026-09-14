@@ -10,12 +10,43 @@ import (
 	"testing"
 
 	"ask-ai-everywhere/internal/askai"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestNormalizeArgsTurnsHelperInvocationIntoProviderCommand(t *testing.T) {
 	want := []string{"provider", "claude"}
 	if got := normalizeArgs("ask-ai-provider", []string{"claude"}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("normalizeArgs() = %v, want %v", got, want)
+	}
+}
+
+func TestProviderPickerSelectsWithArrowKeysAndEnter(t *testing.T) {
+	model := newProviderPicker("chatgpt")
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = updated.(providerPickerModel)
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(providerPickerModel)
+
+	if model.selection.Provider != "claude" || model.cancelled {
+		t.Fatalf("selection = %+v, cancelled = %v", model.selection, model.cancelled)
+	}
+	if command == nil {
+		t.Fatal("Enter did not finish the picker")
+	}
+}
+
+func TestProviderPickerCancelsWithoutASelection(t *testing.T) {
+	model := newProviderPicker("claude")
+
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(providerPickerModel)
+
+	if !model.cancelled || model.selection.Provider != "" {
+		t.Fatalf("selection = %+v, cancelled = %v", model.selection, model.cancelled)
+	}
+	if command == nil {
+		t.Fatal("Escape did not finish the picker")
 	}
 }
 
@@ -27,7 +58,7 @@ func TestProviderWithoutArgumentsPromptsForAndPersistsSelection(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	exitCode := runProvider(configPath, nil, strings.NewReader("2\n"), &stdout, &stderr)
+	exitCode := runProvider(configPath, nil, strings.NewReader("\x1b[B\r"), &stdout, &stderr)
 	if exitCode != 0 {
 		t.Fatalf("runProvider() exit = %d, stderr = %q", exitCode, stderr.String())
 	}
@@ -38,7 +69,7 @@ func TestProviderWithoutArgumentsPromptsForAndPersistsSelection(t *testing.T) {
 	if config.Provider != "claude" {
 		t.Fatalf("provider = %q, want claude", config.Provider)
 	}
-	for _, expected := range []string{"Current provider: chatgpt", "Choose provider", "Provider set to claude"} {
+	for _, expected := range []string{"Choose AI provider", "Current: chatgpt", "Provider set to claude"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("stdout = %q, missing %q", stdout.String(), expected)
 		}
@@ -53,7 +84,7 @@ func TestProviderPickerPromptsForCustomURL(t *testing.T) {
 	exitCode := runProvider(
 		configPath,
 		nil,
-		strings.NewReader("5\nhttps://example.com/chat\n"),
+		strings.NewReader("\x1b[B\x1b[B\x1b[B\x1b[B\rhttps://example.com/chat\r"),
 		&stdout,
 		&stderr,
 	)
