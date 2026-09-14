@@ -15,6 +15,7 @@ type fakeDesktop struct {
 	pasteErr      error
 	openedURL     string
 	pasted        bool
+	composer      string
 	notifications []string
 	sleeps        []time.Duration
 }
@@ -34,8 +35,9 @@ func (f *fakeDesktop) OpenURL(url string) error {
 	f.openedURL = url
 	return f.openErr
 }
-func (f *fakeDesktop) Paste() error {
+func (f *fakeDesktop) ReplaceDraft() error {
 	f.pasted = true
+	f.composer = f.clipboard
 	return f.pasteErr
 }
 func (f *fakeDesktop) Notify(_ string, body string) error {
@@ -117,7 +119,7 @@ func TestRunDoesNotPasteWhenBrowserCannotOpen(t *testing.T) {
 		t.Fatal("Run() unexpectedly succeeded")
 	}
 	if desktop.pasted {
-		t.Fatal("Paste() called after OpenURL() failed")
+		t.Fatal("ReplaceDraft() called after OpenURL() failed")
 	}
 	if desktop.clipboard != "Selected text" {
 		t.Fatalf("clipboard = %q", desktop.clipboard)
@@ -170,5 +172,20 @@ func TestRunFromClipboardRejectsEmptyClipboardWithoutOpeningBrowser(t *testing.T
 	}
 	if len(desktop.notifications) != 1 {
 		t.Fatalf("notifications = %v", desktop.notifications)
+	}
+}
+
+func TestRunReplacesRestoredComposerDraftWithNewSelection(t *testing.T) {
+	desktop := &fakeDesktop{
+		clipboard:    "previous selection",
+		selectedText: "write plan",
+		composer:     `"provider": "chatgpt",`,
+	}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if desktop.composer != "write plan" {
+		t.Fatalf("composer = %q, want only the new selection", desktop.composer)
 	}
 }

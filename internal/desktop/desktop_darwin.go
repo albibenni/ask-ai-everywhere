@@ -31,8 +31,12 @@ func (s *System) OpenURL(url string) error {
 	return exec.Command("open", url).Run()
 }
 
-func (s *System) Paste() error {
-	return runAppleScript(`tell application "System Events" to keystroke "v" using command down`)
+func (s *System) ReplaceDraft() error {
+	return runAppleScript(`tell application "System Events"
+keystroke "a" using command down
+delay 0.05
+keystroke "v" using command down
+end tell`)
 }
 
 func (s *System) Notify(title, body string) error {

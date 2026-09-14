@@ -5,8 +5,9 @@ same command works from an Omarchy/Hyprland or macOS/AeroSpace keybinding.
 
 Ask AI Everywhere does not use an API key, put selected text in a URL, or submit
 the prompt. It copies the selection locally, opens the configured provider in
-the default browser, and makes a best-effort simulated paste. If automation
-fails, the selection remains on the clipboard for a manual paste.
+the default browser, selects any restored composer draft, and makes a
+best-effort simulated paste that replaces it. If automation fails, the
+selection remains on the clipboard for a manual paste.
 
 ## Behavior
 
@@ -16,8 +17,8 @@ fails, the selection remains on the clipboard for a manual paste.
    uses its native exact-key dispatcher; macOS uses Accessibility automation.
 4. It opens a fresh tab for the provider saved in
    `~/.config/ask-ai/config.json`.
-5. After a configurable page-load delay, it simulates Paste without pressing
-   Enter.
+5. After a configurable page-load delay, it simulates Select All followed by
+   Paste, replacing any restored unsent draft without pressing Enter.
 
 If no text is selected, the previous text clipboard is restored where possible,
 a desktop notification appears, and no browser tab is opened. If the browser or
@@ -194,6 +195,8 @@ the official [AeroSpace command reference](https://nikitabobko.github.io/AeroSpa
   Accessibility permission.
 - **The text remains only on the clipboard:** increase `pasteDelayMs`; verify
   that the AI page focuses its prompt when it finishes loading.
+- **Old and new drafts appear together:** update the installed binary. Current
+  versions select the restored composer draft before pasting the new selection.
 - **Paste failure notification on macOS:** enable Accessibility access for the
   launcher and retry.
 - **Nothing happens from a keybinding:** use an absolute binary path, then run

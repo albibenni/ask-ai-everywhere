@@ -2,7 +2,17 @@
 
 package desktop
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestReplaceDraftArgumentsSelectAllBeforePasting(t *testing.T) {
+	want := "-M ctrl -k a -s 50 -k v -m ctrl"
+	if got := strings.Join(replaceDraftArguments(), " "); got != want {
+		t.Fatalf("replaceDraftArguments() = %q, want %q", got, want)
+	}
+}
 
 func TestCopyKeyUsesTerminalSafeShortcutForOmarchyTerminalTag(t *testing.T) {
 	window := []byte(`{"class":"com.mitchellh.ghostty","tags":["terminal*"]}`)

@@ -40,8 +40,8 @@ func (s *System) OpenURL(url string) error {
 	return exec.Command("xdg-open", url).Run()
 }
 
-func (s *System) Paste() error {
-	return exec.Command("wtype", "-M", "ctrl", "v", "-m", "ctrl").Run()
+func (s *System) ReplaceDraft() error {
+	return exec.Command("wtype", replaceDraftArguments()...).Run()
 }
 
 func (s *System) Notify(title, body string) error {
@@ -59,6 +59,10 @@ func copyKey(windowJSON []byte) string {
 
 func shortcutState(key, state string) string {
 	return fmt.Sprintf(`hl.dsp.send_key_state({ mods = "CTRL", key = %q, state = %q })`, key, state)
+}
+
+func replaceDraftArguments() []string {
+	return []string{"-M", "ctrl", "-k", "a", "-s", "50", "-k", "v", "-m", "ctrl"}
 }
 
 func activeWindowIsTerminal(windowJSON []byte) bool {

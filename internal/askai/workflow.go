@@ -20,7 +20,7 @@ type Desktop interface {
 	WriteClipboard(string) error
 	CopySelection() error
 	OpenURL(string) error
-	Paste() error
+	ReplaceDraft() error
 	Notify(title, body string) error
 	Sleep(time.Duration)
 }
@@ -67,7 +67,7 @@ func openAndPaste(config Config, desktop Desktop, selectedText string) error {
 	}
 
 	desktop.Sleep(config.PasteDelay)
-	if err := desktop.Paste(); err != nil {
+	if err := desktop.ReplaceDraft(); err != nil {
 		_ = desktop.Notify("Ask AI", "Text injection failed. Paste the selected text from your clipboard.")
 		return fmt.Errorf("paste selection: %w", err)
 	}
