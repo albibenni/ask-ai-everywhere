@@ -132,10 +132,19 @@ Fields:
 
 ### Change provider from the command line
 
-Show the current provider:
+Open the interactive provider picker:
 
 ```sh
 ask-ai provider
+```
+
+It shows the current provider and prompts for ChatGPT, Claude, Gemini, Kimi, or
+a custom HTTPS URL. Press Enter without choosing to keep the current provider.
+
+Print the current provider non-interactively:
+
+```sh
+ask-ai provider current
 ```
 
 Change it without opening the JSON file:
@@ -156,6 +165,8 @@ ask-ai-provider claude
 ask-ai-provider custom https://example.com/chat
 ```
 
+Running `ask-ai-provider` without arguments opens the same interactive picker.
+
 Both commands update the configured file atomically. If that file is a symlink,
 its target is updated without replacing the symlink. In this setup, changes are
 written directly to the tracked file under `~/dotfiles/ask-ai`.
@@ -170,8 +181,8 @@ it immediately with:
 source <(ask-ai completion bash)
 ```
 
-Provider completion includes `chatgpt`, `claude`, `gemini`, `kimi`, and
-`custom`.
+Provider completion includes `current`, `chatgpt`, `claude`, `gemini`, `kimi`,
+and `custom`.
 
 The built-in destinations are:
 

@@ -2,7 +2,7 @@ package askai
 
 // BashCompletion returns completion definitions for the main and helper commands.
 func BashCompletion() string {
-	return `_ask_ai_providers="chatgpt claude gemini kimi custom"
+	return `_ask_ai_providers="current chatgpt claude gemini kimi custom"
 
 _ask_ai_provider() {
   local cur="${COMP_WORDS[COMP_CWORD]}"

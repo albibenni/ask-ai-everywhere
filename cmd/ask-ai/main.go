@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"ask-ai-everywhere/internal/askai"
 	"ask-ai-everywhere/internal/desktop"
@@ -28,7 +31,7 @@ func run() int {
 	fromClipboard := flag.Bool("from-clipboard", false, "use text already copied by an application integration")
 	showVersion := flag.Bool("version", false, "print version")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: ask-ai [flags] [provider [NAME [HTTPS_URL]] | completion bash]\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: ask-ai [flags] [provider [current|NAME [HTTPS_URL]] | completion bash]\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -40,7 +43,7 @@ func run() int {
 	if len(args) > 0 {
 		switch args[0] {
 		case "provider":
-			return runProvider(*configPath, args[1:])
+			return runProvider(*configPath, args[1:], os.Stdin, os.Stdout, os.Stderr)
 		case "completion":
 			if len(args) == 2 && args[1] == "bash" {
 				fmt.Print(askai.BashCompletion())
@@ -82,7 +85,8 @@ func formatRunError(err error) string {
 Select text in an application and use your configured keybinding.
 
 Provider commands:
-  ask-ai provider
+  ask-ai provider                         # interactive picker
+  ask-ai provider current
   ask-ai provider <chatgpt|claude|gemini|kimi>
   ask-ai provider custom <HTTPS_URL>
 
@@ -97,18 +101,21 @@ func normalizeArgs(program string, args []string) []string {
 	return append([]string{"provider"}, args...)
 }
 
-func runProvider(configPath string, args []string) int {
+func runProvider(configPath string, args []string, input io.Reader, output, errorOutput io.Writer) int {
 	if len(args) == 0 {
+		return promptForProvider(configPath, input, output, errorOutput)
+	}
+	if len(args) == 1 && args[0] == "current" {
 		config, err := askai.LoadConfig(configPath)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "ask-ai provider:", err)
+			fmt.Fprintln(errorOutput, "ask-ai provider:", err)
 			return 1
 		}
-		fmt.Println(config.Provider)
+		fmt.Fprintln(output, config.Provider)
 		return 0
 	}
 	if len(args) > 2 {
-		fmt.Fprintln(os.Stderr, "usage: ask-ai provider NAME [HTTPS_URL]")
+		fmt.Fprintln(errorOutput, "usage: ask-ai provider [current|NAME [HTTPS_URL]]")
 		return 2
 	}
 
@@ -117,9 +124,64 @@ func runProvider(configPath string, args []string) int {
 		customURL = args[1]
 	}
 	if err := askai.SetProvider(configPath, args[0], customURL); err != nil {
-		fmt.Fprintln(os.Stderr, "ask-ai provider:", err)
+		fmt.Fprintln(errorOutput, "ask-ai provider:", err)
 		return 1
 	}
-	fmt.Println(args[0])
+	fmt.Fprintln(output, args[0])
+	return 0
+}
+
+func promptForProvider(configPath string, input io.Reader, output, errorOutput io.Writer) int {
+	config, err := askai.LoadConfig(configPath)
+	if err != nil {
+		fmt.Fprintln(errorOutput, "ask-ai provider:", err)
+		return 1
+	}
+	fmt.Fprintf(output, `Current provider: %s
+Choose provider:
+  1) ChatGPT
+  2) Claude
+  3) Gemini
+  4) Kimi
+  5) Custom URL
+Selection [keep current]: `, config.Provider)
+
+	scanner := bufio.NewScanner(input)
+	if !scanner.Scan() {
+		fmt.Fprintln(errorOutput, "ask-ai provider: no selection received")
+		return 1
+	}
+	choice := strings.ToLower(strings.TrimSpace(scanner.Text()))
+	if choice == "" {
+		fmt.Fprintf(output, "Provider unchanged: %s\n", config.Provider)
+		return 0
+	}
+	providers := map[string]string{
+		"1": "chatgpt", "chatgpt": "chatgpt",
+		"2": "claude", "claude": "claude",
+		"3": "gemini", "gemini": "gemini",
+		"4": "kimi", "kimi": "kimi",
+		"5": "custom", "custom": "custom",
+	}
+	provider, ok := providers[choice]
+	if !ok {
+		fmt.Fprintf(errorOutput, "ask-ai provider: invalid selection %q\n", choice)
+		return 2
+	}
+
+	customURL := ""
+	if provider == "custom" {
+		fmt.Fprint(output, "Custom HTTPS URL: ")
+		if !scanner.Scan() {
+			fmt.Fprintln(errorOutput, "ask-ai provider: no custom URL received")
+			return 1
+		}
+		customURL = strings.TrimSpace(scanner.Text())
+	}
+	if err := askai.SetProvider(configPath, provider, customURL); err != nil {
+		fmt.Fprintln(errorOutput, "ask-ai provider:", err)
+		return 1
+	}
+	fmt.Fprintf(output, "Provider set to %s\n", provider)
 	return 0
 }

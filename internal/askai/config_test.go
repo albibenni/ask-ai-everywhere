@@ -75,7 +75,7 @@ func TestSetProviderRequiresHTTPSForCustomProvider(t *testing.T) {
 
 func TestBashCompletionIncludesProvidersAndHelperCommand(t *testing.T) {
 	completion := BashCompletion()
-	for _, expected := range []string{"chatgpt", "claude", "gemini", "kimi", "custom", "ask-ai-provider"} {
+	for _, expected := range []string{"current", "chatgpt", "claude", "gemini", "kimi", "custom", "ask-ai-provider"} {
 		if !strings.Contains(completion, expected) {
 			t.Fatalf("completion does not include %q", expected)
 		}
