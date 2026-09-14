@@ -40,6 +40,21 @@ func Run(config Config, desktop Desktop) error {
 		return err
 	}
 
+	return openAndPaste(config, desktop, selectedText)
+}
+
+// RunFromClipboard opens text explicitly placed on the clipboard by an
+// application integration, such as a Neovim Visual-mode mapping.
+func RunFromClipboard(config Config, desktop Desktop) error {
+	selectedText, err := desktop.ReadClipboard()
+	if err != nil || strings.TrimSpace(selectedText) == "" {
+		_ = desktop.Notify("Ask AI", "No copied text was found. Nothing was opened.")
+		return ErrNoSelection
+	}
+	return openAndPaste(config, desktop, selectedText)
+}
+
+func openAndPaste(config Config, desktop Desktop, selectedText string) error {
 	// Keep the exact selection available even if browser automation fails.
 	if err := desktop.WriteClipboard(selectedText); err != nil {
 		_ = desktop.Notify("Ask AI", "Could not copy the selected text to the clipboard.")

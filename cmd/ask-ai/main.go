@@ -23,6 +23,7 @@ func run() int {
 	}
 
 	configPath := flag.String("config", defaultPath, "path to config.json")
+	fromClipboard := flag.Bool("from-clipboard", false, "use text already copied by an application integration")
 	showVersion := flag.Bool("version", false, "print version")
 	flag.Parse()
 	if *showVersion {
@@ -37,7 +38,12 @@ func run() int {
 		fmt.Fprintln(os.Stderr, "ask-ai:", err)
 		return 1
 	}
-	if err := askai.Run(config, platform); err != nil {
+	if *fromClipboard {
+		err = askai.RunFromClipboard(config, platform)
+	} else {
+		err = askai.Run(config, platform)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "ask-ai:", err)
 		return 1
 	}

@@ -142,3 +142,33 @@ func TestRunReportsSelectionAutomationFailureWithoutOpeningBrowser(t *testing.T)
 		t.Fatalf("notifications = %v", desktop.notifications)
 	}
 }
+
+func TestRunFromClipboardOpensAndPastesExplicitlyCopiedText(t *testing.T) {
+	desktop := &fakeDesktop{clipboard: "Yanked visual selection"}
+	config := Config{URL: "https://chatgpt.com/", PasteDelay: 1500 * time.Millisecond}
+
+	if err := RunFromClipboard(config, desktop); err != nil {
+		t.Fatalf("RunFromClipboard() error = %v", err)
+	}
+	if desktop.openedURL != config.URL || !desktop.pasted {
+		t.Fatalf("opened URL = %q, pasted = %v", desktop.openedURL, desktop.pasted)
+	}
+	if desktop.clipboard != "Yanked visual selection" {
+		t.Fatalf("clipboard = %q", desktop.clipboard)
+	}
+}
+
+func TestRunFromClipboardRejectsEmptyClipboardWithoutOpeningBrowser(t *testing.T) {
+	desktop := &fakeDesktop{clipboard: "  \n"}
+
+	err := RunFromClipboard(Config{URL: "https://chatgpt.com/"}, desktop)
+	if !errors.Is(err, ErrNoSelection) {
+		t.Fatalf("RunFromClipboard() error = %v, want ErrNoSelection", err)
+	}
+	if desktop.openedURL != "" {
+		t.Fatalf("opened URL = %q", desktop.openedURL)
+	}
+	if len(desktop.notifications) != 1 {
+		t.Fatalf("notifications = %v", desktop.notifications)
+	}
+}

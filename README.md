@@ -12,7 +12,8 @@ fails, the selection remains on the clipboard for a manual paste.
 
 1. Select text in the focused application.
 2. Press your configured window-manager shortcut.
-3. `ask-ai` simulates Copy and checks that text was captured.
+3. `ask-ai` copies the selection and checks that text was captured. Hyprland
+   uses its native exact-key dispatcher; macOS uses Accessibility automation.
 4. It opens a fresh tab for the provider saved in
    `~/.config/ask-ai/config.json`.
 5. After a configurable page-load delay, it simulates Paste without pressing
@@ -35,15 +36,16 @@ too slowly.
 Runtime commands:
 
 - `wl-copy` and `wl-paste` from `wl-clipboard`
-- `wtype`
+- `wtype` (used for browser paste)
 - `xdg-open`
 - `notify-send`
 - `hyprctl` (used to recognize terminal windows)
 
 These are already present on the Omarchy machine used to develop the project.
 Other Wayland desktops can invoke the CLI too, provided those commands work in
-the session. Under Omarchy, terminal-tagged windows use Ctrl-Insert for Copy so
-selected terminal text is captured without sending Ctrl-C to the shell.
+the session. Under Omarchy, native Hyprland dispatch avoids merging physically
+held shortcut modifiers into Ctrl-C. Terminal-tagged windows use Ctrl-Insert so
+selected terminal text is captured without interrupting the shell.
 
 ### macOS
 
@@ -202,3 +204,24 @@ the official [AeroSpace command reference](https://nikitabobko.github.io/AeroSpa
 The tool intentionally has no provider-specific browser extension or DOM
 integration. Provider UI changes may affect autofocus, but the clipboard
 fallback remains available.
+
+## Neovim Visual selections
+
+A Neovim Visual selection belongs to Neovim rather than the terminal surface,
+so a compositor-level Copy shortcut cannot read it. Add an editor mapping that
+yanks the selection to the system clipboard and invokes the explicit clipboard
+mode:
+
+```lua
+vim.keymap.set("x", "<leader>ai", function()
+  vim.cmd([[normal! "+y]])
+  vim.fn.jobstart(
+    { (vim.env.HOME or "") .. "/.local/bin/ask-ai", "--from-clipboard" },
+    { detach = true }
+  )
+end, { desc = "Open selection in AI chat" })
+```
+
+In Visual mode, press `<leader>ai`. The `--from-clipboard` option is intended
+for integrations that explicitly copy fresh text first; the normal global
+shortcut retains stale-clipboard detection.

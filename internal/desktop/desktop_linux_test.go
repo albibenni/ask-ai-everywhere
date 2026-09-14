@@ -2,34 +2,32 @@
 
 package desktop
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
-func TestCopyArgumentsUseTerminalSafeShortcutForOmarchyTerminalTag(t *testing.T) {
+func TestCopyKeyUsesTerminalSafeShortcutForOmarchyTerminalTag(t *testing.T) {
 	window := []byte(`{"class":"com.mitchellh.ghostty","tags":["terminal*"]}`)
-	want := []string{"-M", "ctrl", "-P", "Insert", "-p", "Insert", "-m", "ctrl"}
-
-	if got := copyArguments(window); !reflect.DeepEqual(got, want) {
-		t.Fatalf("copyArguments() = %v, want %v", got, want)
+	if got := copyKey(window); got != "Insert" {
+		t.Fatalf("copyKey() = %q, want Insert", got)
 	}
 }
 
-func TestCopyArgumentsUseStandardShortcutForOtherWindows(t *testing.T) {
+func TestCopyKeyUsesStandardShortcutForOtherWindows(t *testing.T) {
 	window := []byte(`{"class":"Brave-browser","tags":[]}`)
-	want := []string{"-M", "ctrl", "c", "-m", "ctrl"}
-
-	if got := copyArguments(window); !reflect.DeepEqual(got, want) {
-		t.Fatalf("copyArguments() = %v, want %v", got, want)
+	if got := copyKey(window); got != "C" {
+		t.Fatalf("copyKey() = %q, want C", got)
 	}
 }
 
-func TestCopyArgumentsFallBackToKnownTerminalClassesWithoutTags(t *testing.T) {
+func TestCopyKeyFallsBackToKnownTerminalClassesWithoutTags(t *testing.T) {
 	window := []byte(`{"class":"Alacritty"}`)
-	want := []string{"-M", "ctrl", "-P", "Insert", "-p", "Insert", "-m", "ctrl"}
+	if got := copyKey(window); got != "Insert" {
+		t.Fatalf("copyKey() = %q, want Insert", got)
+	}
+}
 
-	if got := copyArguments(window); !reflect.DeepEqual(got, want) {
-		t.Fatalf("copyArguments() = %v, want %v", got, want)
+func TestShortcutStateUsesHyprlandExactKeyDispatch(t *testing.T) {
+	want := `hl.dsp.send_key_state({ mods = "CTRL", key = "C", state = "down" })`
+	if got := shortcutState("C", "down"); got != want {
+		t.Fatalf("shortcutState() = %q, want %q", got, want)
 	}
 }

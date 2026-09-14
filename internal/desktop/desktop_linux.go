@@ -5,6 +5,7 @@ package desktop
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -27,7 +28,12 @@ func (s *System) WriteClipboard(text string) error {
 
 func (s *System) CopySelection() error {
 	window, _ := exec.Command("hyprctl", "activewindow", "-j").Output()
-	return exec.Command("wtype", copyArguments(window)...).Run()
+	key := copyKey(window)
+	if err := exec.Command("hyprctl", "dispatch", shortcutState(key, "down")).Run(); err != nil {
+		return err
+	}
+	time.Sleep(50 * time.Millisecond)
+	return exec.Command("hyprctl", "dispatch", shortcutState(key, "up")).Run()
 }
 
 func (s *System) OpenURL(url string) error {
@@ -44,11 +50,15 @@ func (s *System) Notify(title, body string) error {
 
 func (s *System) Sleep(duration time.Duration) { time.Sleep(duration) }
 
-func copyArguments(windowJSON []byte) []string {
+func copyKey(windowJSON []byte) string {
 	if activeWindowIsTerminal(windowJSON) {
-		return []string{"-M", "ctrl", "-P", "Insert", "-p", "Insert", "-m", "ctrl"}
+		return "Insert"
 	}
-	return []string{"-M", "ctrl", "c", "-m", "ctrl"}
+	return "C"
+}
+
+func shortcutState(key, state string) string {
+	return fmt.Sprintf(`hl.dsp.send_key_state({ mods = "CTRL", key = %q, state = %q })`, key, state)
 }
 
 func activeWindowIsTerminal(windowJSON []byte) bool {
