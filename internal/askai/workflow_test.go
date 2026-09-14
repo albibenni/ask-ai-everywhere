@@ -71,8 +71,30 @@ func TestRunCopiesSelectionOpensFreshTabAndPastesDraft(t *testing.T) {
 	}
 }
 
-func TestRunStopsAndRestoresClipboardWhenThereIsNoSelection(t *testing.T) {
+func TestRunUsesMostRecentClipboardItemWhenThereIsNoSelection(t *testing.T) {
 	desktop := &fakeDesktop{clipboard: "previous"}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if desktop.openedURL != "https://chatgpt.com/" {
+		t.Fatalf("opened URL = %q", desktop.openedURL)
+	}
+	if desktop.clipboard != "previous" {
+		t.Fatalf("clipboard = %q, want previous", desktop.clipboard)
+	}
+	if desktop.composer != "previous" {
+		t.Fatalf("composer = %q, want previous", desktop.composer)
+	}
+	if len(desktop.notifications) != 1 ||
+		!strings.Contains(desktop.notifications[0], "first") ||
+		!strings.Contains(desktop.notifications[0], "clipboard") {
+		t.Fatalf("notifications = %v", desktop.notifications)
+	}
+}
+
+func TestRunStopsWhenThereIsNoSelectionAndClipboardIsEmpty(t *testing.T) {
+	desktop := &fakeDesktop{clipboard: "  \n"}
 
 	err := Run(Config{URL: "https://chatgpt.com/"}, desktop)
 	if !errors.Is(err, ErrNoSelection) {
@@ -80,9 +102,6 @@ func TestRunStopsAndRestoresClipboardWhenThereIsNoSelection(t *testing.T) {
 	}
 	if desktop.openedURL != "" {
 		t.Fatalf("opened URL = %q", desktop.openedURL)
-	}
-	if desktop.clipboard != "previous" {
-		t.Fatalf("clipboard = %q, want previous", desktop.clipboard)
 	}
 	if len(desktop.notifications) != 1 {
 		t.Fatalf("notifications = %v", desktop.notifications)

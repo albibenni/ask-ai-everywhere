@@ -20,14 +20,18 @@ selection remains on the clipboard for a manual paste.
 5. After a configurable page-load delay, it simulates Select All followed by
    Paste, replacing any restored unsent draft without pressing Enter.
 
-If no text is selected, the previous text clipboard is restored where possible,
-a desktop notification appears, and no browser tab is opened. If the browser or
-paste command reports a failure, the selected text stays on the clipboard and a
-notification explains that it can be pasted manually.
+If no text is selected and the clipboard contains text, a desktop notification
+warns that the first (most recent) clipboard item will be used, then that text is
+opened as the draft. The utility reads the current clipboard value; it does not
+inspect a clipboard manager's full history. If neither source contains text, it
+notifies and stops without opening a browser tab. If the browser or paste command
+reports a failure, the selected or clipboard text stays available for a manual
+paste.
 
-Running `ask-ai` directly in a terminal without an available selection also
-prints provider commands and points to `ask-ai -h`. The same executable remains
-the keybinding target; no separate selection flag is required.
+Running `ask-ai` directly in a terminal without an available selection uses the
+current clipboard text after showing the warning. If the clipboard is empty too,
+it prints provider commands and points to `ask-ai -h`. The same executable
+remains the keybinding target; no separate selection flag is required.
 
 Browser pages do not expose a portable way for this utility to inspect their
 prompt field. A successful paste command therefore means "injection attempted,"
@@ -248,9 +252,12 @@ the official [AeroSpace command reference](https://nikitabobko.github.io/AeroSpa
 
 ## Troubleshooting
 
-- **No selected text notification:** the focused application did not respond to
-  simulated Copy, or only whitespace was selected. On macOS, verify
-  Accessibility permission.
+- **Clipboard fallback notification:** the focused application had no selection,
+  so the first (most recent) clipboard item is being used. Cancel or close the
+  fresh tab if that is not the text you intended.
+- **No selected text notification with no browser:** neither the focused
+  selection nor the current clipboard contains text. On macOS, verify
+  Accessibility permission if copying a visible selection fails.
 - **The text remains only on the clipboard:** increase `pasteDelayMs`; verify
   that the AI page focuses its prompt when it finishes loading.
 - **Old and new drafts appear together:** update the installed binary. Current

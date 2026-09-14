@@ -33,6 +33,10 @@ func Run(config Config, desktop Desktop) error {
 	selectedText, err := captureSelection(desktop, previousClipboard)
 	if err != nil {
 		if errors.Is(err, ErrNoSelection) {
+			if strings.TrimSpace(previousClipboard) != "" {
+				_ = desktop.Notify("Ask AI", "No text selected. Using the first (most recent) item in the clipboard.")
+				return openAndPaste(config, desktop, previousClipboard)
+			}
 			_ = desktop.Notify("Ask AI", "No selected text was found. Nothing was opened.")
 		} else {
 			_ = desktop.Notify("Ask AI", "Could not capture selected text. Check desktop automation permissions. Nothing was opened.")
