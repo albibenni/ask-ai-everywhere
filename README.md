@@ -36,7 +36,8 @@ remains the keybinding target; no separate selection flag is required.
 Browser pages do not expose a portable way for this utility to inspect their
 prompt field. A successful paste command therefore means "injection attempted,"
 not that the page DOM was verified. Increase `pasteDelayMs` if a provider loads
-too slowly.
+too slowly. Kimi receives its advertised Ctrl-K New Chat shortcut before
+Select All and Paste so its composer has focus.
 
 ## Supported systems
 
@@ -198,9 +199,9 @@ The built-in destinations are:
 | ChatGPT | `https://chatgpt.com/` |
 | Claude | `https://claude.ai/new` |
 | Gemini | `https://gemini.google.com/app` |
-| Kimi | `https://www.kimi.com/` |
+| Kimi | `https://www.kimi.ai/` |
 
-The Kimi destination follows its [official consumer site](https://www.kimi.com/).
+The Kimi destination follows its [official consumer site](https://www.kimi.ai/).
 Custom destinations must be valid HTTPS URLs. Unknown fields and invalid values
 are rejected rather than silently ignored. If the file does not exist, ChatGPT
 and the default delays are used. Set `ASK_AI_CONFIG` to use another config path

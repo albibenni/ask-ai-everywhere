@@ -40,8 +40,8 @@ func (s *System) OpenURL(url string) error {
 	return exec.Command("xdg-open", url).Run()
 }
 
-func (s *System) ReplaceDraft() error {
-	return exec.Command("wtype", replaceDraftArguments()...).Run()
+func (s *System) ReplaceDraft(provider string) error {
+	return exec.Command("wtype", replaceDraftArguments(provider)...).Run()
 }
 
 func (s *System) Notify(title, body string) error {
@@ -61,8 +61,12 @@ func shortcutState(key, state string) string {
 	return fmt.Sprintf(`hl.dsp.send_key_state({ mods = "CTRL", key = %q, state = %q })`, key, state)
 }
 
-func replaceDraftArguments() []string {
-	return []string{"-M", "ctrl", "-k", "a", "-s", "50", "-k", "v", "-m", "ctrl"}
+func replaceDraftArguments(provider string) []string {
+	arguments := make([]string, 0, 16)
+	if provider == "kimi" {
+		arguments = append(arguments, "-M", "ctrl", "-k", "k", "-m", "ctrl", "-s", "100")
+	}
+	return append(arguments, "-M", "ctrl", "-k", "a", "-s", "50", "-k", "v", "-m", "ctrl")
 }
 
 func activeWindowIsTerminal(windowJSON []byte) bool {

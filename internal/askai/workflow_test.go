@@ -8,16 +8,17 @@ import (
 )
 
 type fakeDesktop struct {
-	clipboard     string
-	selectedText  string
-	copyErr       error
-	openErr       error
-	pasteErr      error
-	openedURL     string
-	pasted        bool
-	composer      string
-	notifications []string
-	sleeps        []time.Duration
+	clipboard       string
+	selectedText    string
+	copyErr         error
+	openErr         error
+	pasteErr        error
+	openedURL       string
+	pasted          bool
+	replaceProvider string
+	composer        string
+	notifications   []string
+	sleeps          []time.Duration
 }
 
 func (f *fakeDesktop) ReadClipboard() (string, error) { return f.clipboard, nil }
@@ -35,8 +36,9 @@ func (f *fakeDesktop) OpenURL(url string) error {
 	f.openedURL = url
 	return f.openErr
 }
-func (f *fakeDesktop) ReplaceDraft() error {
+func (f *fakeDesktop) ReplaceDraft(provider string) error {
 	f.pasted = true
+	f.replaceProvider = provider
 	f.composer = f.clipboard
 	return f.pasteErr
 }
@@ -49,6 +51,7 @@ func (f *fakeDesktop) Sleep(duration time.Duration) { f.sleeps = append(f.sleeps
 func TestRunCopiesSelectionOpensFreshTabAndPastesDraft(t *testing.T) {
 	desktop := &fakeDesktop{clipboard: "previous", selectedText: "Selected text"}
 	config := Config{
+		Provider:             "chatgpt",
 		URL:                  "https://chatgpt.com/",
 		ShortcutReleaseDelay: 200 * time.Millisecond,
 		PasteDelay:           1500 * time.Millisecond,
@@ -62,6 +65,9 @@ func TestRunCopiesSelectionOpensFreshTabAndPastesDraft(t *testing.T) {
 	}
 	if !desktop.pasted {
 		t.Fatal("selection was not pasted")
+	}
+	if desktop.replaceProvider != "chatgpt" {
+		t.Fatalf("replace provider = %q", desktop.replaceProvider)
 	}
 	if desktop.clipboard != "Selected text" {
 		t.Fatalf("clipboard = %q", desktop.clipboard)

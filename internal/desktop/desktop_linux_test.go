@@ -9,7 +9,14 @@ import (
 
 func TestReplaceDraftArgumentsSelectAllBeforePasting(t *testing.T) {
 	want := "-M ctrl -k a -s 50 -k v -m ctrl"
-	if got := strings.Join(replaceDraftArguments(), " "); got != want {
+	if got := strings.Join(replaceDraftArguments("chatgpt"), " "); got != want {
+		t.Fatalf("replaceDraftArguments() = %q, want %q", got, want)
+	}
+}
+
+func TestReplaceDraftArgumentsFocusKimiComposerBeforePasting(t *testing.T) {
+	want := "-M ctrl -k k -m ctrl -s 100 -M ctrl -k a -s 50 -k v -m ctrl"
+	if got := strings.Join(replaceDraftArguments("kimi"), " "); got != want {
 		t.Fatalf("replaceDraftArguments() = %q, want %q", got, want)
 	}
 }

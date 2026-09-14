@@ -90,7 +90,7 @@ func TestLoadConfigResolvesBuiltInAndCustomProviders(t *testing.T) {
 	}{
 		{"claude", `{"provider":"claude"}`, "https://claude.ai/new"},
 		{"gemini", `{"provider":"gemini"}`, "https://gemini.google.com/app"},
-		{"kimi", `{"provider":"kimi"}`, "https://www.kimi.com/"},
+		{"kimi", `{"provider":"kimi"}`, "https://www.kimi.ai/"},
 		{"custom", `{"provider":"custom","customUrl":"https://example.com/chat"}`, "https://example.com/chat"},
 	}
 

@@ -20,7 +20,7 @@ var providerURLs = map[string]string{
 	"chatgpt": "https://chatgpt.com/",
 	"claude":  "https://claude.ai/new",
 	"gemini":  "https://gemini.google.com/app",
-	"kimi":    "https://www.kimi.com/",
+	"kimi":    "https://www.kimi.ai/",
 }
 
 type configFile struct {

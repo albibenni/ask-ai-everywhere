@@ -31,9 +31,15 @@ func (s *System) OpenURL(url string) error {
 	return exec.Command("open", url).Run()
 }
 
-func (s *System) ReplaceDraft() error {
+func (s *System) ReplaceDraft(provider string) error {
+	composerFocus := ""
+	if provider == "kimi" {
+		composerFocus = `keystroke "k" using command down
+delay 0.1
+`
+	}
 	return runAppleScript(`tell application "System Events"
-keystroke "a" using command down
+` + composerFocus + `keystroke "a" using command down
 delay 0.05
 keystroke "v" using command down
 end tell`)
