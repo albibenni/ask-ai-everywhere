@@ -25,6 +25,10 @@ a desktop notification appears, and no browser tab is opened. If the browser or
 paste command reports a failure, the selected text stays on the clipboard and a
 notification explains that it can be pasted manually.
 
+Running `ask-ai` directly in a terminal without an available selection also
+prints provider commands and points to `ask-ai -h`. The same executable remains
+the keybinding target; no separate selection flag is required.
+
 Browser pages do not expose a portable way for this utility to inspect their
 prompt field. A successful paste command therefore means "injection attempted,"
 not that the page DOM was verified. Increase `pasteDelayMs` if a provider loads
@@ -125,6 +129,49 @@ Fields:
 | `customUrl` | HTTPS browser URL required when `provider` is `custom` |
 | `shortcutReleaseDelayMs` | Delay before Copy, allowing shortcut keys to be released |
 | `pasteDelayMs` | Delay between opening the tab and attempting Paste |
+
+### Change provider from the command line
+
+Show the current provider:
+
+```sh
+ask-ai provider
+```
+
+Change it without opening the JSON file:
+
+```sh
+ask-ai provider chatgpt
+ask-ai provider claude
+ask-ai provider gemini
+ask-ai provider kimi
+ask-ai provider custom https://example.com/chat
+```
+
+The installed helper provides shorter equivalents:
+
+```sh
+ask-ai-provider
+ask-ai-provider claude
+ask-ai-provider custom https://example.com/chat
+```
+
+Both commands update the configured file atomically. If that file is a symlink,
+its target is updated without replacing the symlink. In this setup, changes are
+written directly to the tracked file under `~/dotfiles/ask-ai`.
+
+### Bash completion
+
+`make install` installs completion for both `ask-ai` and `ask-ai-provider` under
+`~/.local/share/bash-completion/completions`. Start a new Bash session, or load
+it immediately with:
+
+```sh
+source <(ask-ai completion bash)
+```
+
+Provider completion includes `chatgpt`, `claude`, `gemini`, `kimi`, and
+`custom`.
 
 The built-in destinations are:
 

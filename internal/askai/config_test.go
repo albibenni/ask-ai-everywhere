@@ -3,6 +3,7 @@ package askai
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,6 +25,60 @@ func TestLoadConfigUsesChatGPTDefaultsWhenFileDoesNotExist(t *testing.T) {
 	}
 	if config.PasteDelay != 1500*time.Millisecond {
 		t.Fatalf("PasteDelay = %v", config.PasteDelay)
+	}
+}
+
+func TestSetProviderUpdatesSymlinkTargetAndPreservesOtherSettings(t *testing.T) {
+	directory := t.TempDir()
+	target := filepath.Join(directory, "dotfiles-config.json")
+	link := filepath.Join(directory, "config.json")
+	body := `{"provider":"chatgpt","customUrl":"https://example.com/chat","shortcutReleaseDelayMs":321,"pasteDelayMs":2345}`
+	if err := os.WriteFile(target, []byte(body), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := SetProvider(link, "claude", ""); err != nil {
+		t.Fatalf("SetProvider() error = %v", err)
+	}
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("config symlink was replaced")
+	}
+	config, err := LoadConfig(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Provider != "claude" || config.ShortcutReleaseDelay != 321*time.Millisecond || config.PasteDelay != 2345*time.Millisecond {
+		t.Fatalf("config = %+v", config)
+	}
+	written, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), `"customUrl": "https://example.com/chat"`) {
+		t.Fatalf("custom URL was not preserved: %s", written)
+	}
+}
+
+func TestSetProviderRequiresHTTPSForCustomProvider(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := SetProvider(path, "custom", "http://example.com"); err == nil {
+		t.Fatal("SetProvider() unexpectedly accepted an HTTP URL")
+	}
+}
+
+func TestBashCompletionIncludesProvidersAndHelperCommand(t *testing.T) {
+	completion := BashCompletion()
+	for _, expected := range []string{"chatgpt", "claude", "gemini", "kimi", "custom", "ask-ai-provider"} {
+		if !strings.Contains(completion, expected) {
+			t.Fatalf("completion does not include %q", expected)
+		}
 	}
 }
 

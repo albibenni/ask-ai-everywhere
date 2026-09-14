@@ -2,12 +2,13 @@ BINARY := ask-ai
 COMMAND := ./cmd/ask-ai
 BUILD_DIR := bin
 INSTALL_PREFIX ?= $(HOME)/.local
+COMPLETION_DIR ?= $(INSTALL_PREFIX)/share/bash-completion/completions
 VERSION ?= dev
 GO_LDFLAGS := -X main.version=$(VERSION)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help fmt test vet check build install cross-build clean
+.PHONY: help fmt test vet check build completion install cross-build clean
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -27,9 +28,16 @@ build: ## Build the executable for the current platform
 	mkdir -p $(BUILD_DIR)
 	go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) $(COMMAND)
 
-install: build ## Install under INSTALL_PREFIX (default: ~/.local)
+completion: build ## Generate Bash completion
+	$(BUILD_DIR)/$(BINARY) completion bash > $(BUILD_DIR)/$(BINARY).bash
+
+install: build completion ## Install CLI, helper, and Bash completion
 	mkdir -p $(DESTDIR)$(INSTALL_PREFIX)/bin
 	install -m 0755 $(BUILD_DIR)/$(BINARY) $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BINARY)
+	ln -sfn $(BINARY) $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BINARY)-provider
+	mkdir -p $(DESTDIR)$(COMPLETION_DIR)
+	install -m 0644 $(BUILD_DIR)/$(BINARY).bash $(DESTDIR)$(COMPLETION_DIR)/$(BINARY)
+	ln -sfn $(BINARY) $(DESTDIR)$(COMPLETION_DIR)/$(BINARY)-provider
 
 cross-build: ## Build Linux and macOS release binaries
 	mkdir -p $(BUILD_DIR)
