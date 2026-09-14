@@ -66,9 +66,8 @@ Go 1.24 or newer is required to build. The resulting executable is standalone;
 Go is not needed at runtime.
 
 ```sh
-go test ./...
-mkdir -p "$HOME/.local/bin"
-go build -o "$HOME/.local/bin/ask-ai" ./cmd/ask-ai
+make check
+make install
 ```
 
 Confirm the installation:
@@ -77,18 +76,21 @@ Confirm the installation:
 $HOME/.local/bin/ask-ai -version
 ```
 
-The development build reports `dev`. Release builds can inject a version with:
+The development build reports `dev`. Set `VERSION` for a versioned build:
 
 ```sh
-go build -ldflags "-X main.version=1.0.0" -o bin/ask-ai ./cmd/ask-ai
+make build VERSION=1.0.0
 ```
 
-Cross-compile from Linux for common macOS targets:
+Build Linux and macOS binaries for Intel and ARM:
 
 ```sh
-GOOS=darwin GOARCH=arm64 go build -o bin/ask-ai-darwin-arm64 ./cmd/ask-ai
-GOOS=darwin GOARCH=amd64 go build -o bin/ask-ai-darwin-amd64 ./cmd/ask-ai
+make cross-build VERSION=1.0.0
 ```
+
+Run `make help` for formatting, testing, vetting, building, installation, and
+cleanup commands. Override `INSTALL_PREFIX` when `~/.local` is not the desired
+installation prefix.
 
 ## Configuration
 
