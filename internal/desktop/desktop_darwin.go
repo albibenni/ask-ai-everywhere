@@ -6,20 +6,22 @@ import (
 	"bytes"
 	"os/exec"
 	"time"
+
+	"ask-ai-everywhere/internal/askai"
 )
 
 type System struct{}
 
 func New() *System { return &System{} }
 
-func (s *System) ReadClipboard() (string, error) {
+func (s *System) ReadClipboard() (askai.ClipboardItem, error) {
 	output, err := exec.Command("pbpaste").Output()
-	return string(output), err
+	return askai.ClipboardItem{MIMEType: "text/plain;charset=utf-8", Data: output}, err
 }
 
-func (s *System) WriteClipboard(text string) error {
+func (s *System) WriteClipboard(item askai.ClipboardItem) error {
 	command := exec.Command("pbcopy")
-	command.Stdin = bytes.NewBufferString(text)
+	command.Stdin = bytes.NewReader(item.Data)
 	return command.Run()
 }
 

@@ -20,16 +20,17 @@ selection remains on the clipboard for a manual paste.
 5. After a configurable page-load delay, it simulates Select All followed by
    Paste, replacing any restored unsent draft without pressing Enter.
 
-If no text is selected and the clipboard contains text, a desktop notification
-warns that the first (most recent) clipboard item will be used, then that text is
-opened as the draft. The utility reads the current clipboard value; it does not
-inspect a clipboard manager's full history. If neither source contains text, it
-notifies and stops without opening a browser tab. If the browser or paste command
-reports a failure, the selected or clipboard text stays available for a manual
-paste.
+If no text is selected and the clipboard contains content, a desktop notification
+warns that the first (most recent) clipboard item will be used, then that item is
+pasted into the draft. On Wayland this includes images and preserves their MIME
+type and raw bytes. The utility reads the current clipboard value; it does not
+inspect a clipboard manager's full history. If neither source contains content,
+it notifies and stops without opening a browser tab. If the browser or paste
+command reports a failure, the selected or clipboard content stays available for
+a manual paste.
 
 Running `ask-ai` directly in a terminal without an available selection uses the
-current clipboard text after showing the warning. If the clipboard is empty too,
+current clipboard item after showing the warning. If the clipboard is empty too,
 it prints provider commands and points to `ask-ai -h`. The same executable
 remains the keybinding target; no separate selection flag is required.
 

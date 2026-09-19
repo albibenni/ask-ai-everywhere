@@ -1,6 +1,7 @@
 package askai
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,10 +15,32 @@ const (
 	capturePollAttempts = 20
 )
 
+// ClipboardItem is one clipboard representation that can be restored without
+// converting images or other binary content to text.
+type ClipboardItem struct {
+	MIMEType string
+	Data     []byte
+}
+
+func textClipboardItem(text string) ClipboardItem {
+	return ClipboardItem{MIMEType: "text/plain;charset=utf-8", Data: []byte(text)}
+}
+
+func (item ClipboardItem) empty() bool {
+	if strings.HasPrefix(item.MIMEType, "text/") || item.MIMEType == "" {
+		return strings.TrimSpace(string(item.Data)) == ""
+	}
+	return len(item.Data) == 0
+}
+
+func (item ClipboardItem) equal(other ClipboardItem) bool {
+	return item.MIMEType == other.MIMEType && bytes.Equal(item.Data, other.Data)
+}
+
 // Desktop contains the operating-system actions needed by the workflow.
 type Desktop interface {
-	ReadClipboard() (string, error)
-	WriteClipboard(string) error
+	ReadClipboard() (ClipboardItem, error)
+	WriteClipboard(ClipboardItem) error
 	CopySelection() error
 	OpenURL(string) error
 	ReplaceDraft(provider string) error
@@ -30,10 +53,10 @@ func Run(config Config, desktop Desktop) error {
 	previousClipboard, _ := desktop.ReadClipboard()
 	desktop.Sleep(config.ShortcutReleaseDelay)
 
-	selectedText, err := captureSelection(desktop, previousClipboard)
+	selectedItem, err := captureSelection(desktop, previousClipboard)
 	if err != nil {
 		if errors.Is(err, ErrNoSelection) {
-			if strings.TrimSpace(previousClipboard) != "" {
+			if !previousClipboard.empty() {
 				_ = desktop.Notify("Ask AI", "No text selected. Using the first (most recent) item in the clipboard.")
 				return openAndPaste(config, desktop, previousClipboard)
 			}
@@ -44,62 +67,62 @@ func Run(config Config, desktop Desktop) error {
 		return err
 	}
 
-	return openAndPaste(config, desktop, selectedText)
+	return openAndPaste(config, desktop, selectedItem)
 }
 
-// RunFromClipboard opens text explicitly placed on the clipboard by an
+// RunFromClipboard opens content explicitly placed on the clipboard by an
 // application integration, such as a Neovim Visual-mode mapping.
 func RunFromClipboard(config Config, desktop Desktop) error {
-	selectedText, err := desktop.ReadClipboard()
-	if err != nil || strings.TrimSpace(selectedText) == "" {
-		_ = desktop.Notify("Ask AI", "No copied text was found. Nothing was opened.")
+	selectedItem, err := desktop.ReadClipboard()
+	if err != nil || selectedItem.empty() {
+		_ = desktop.Notify("Ask AI", "No copied content was found. Nothing was opened.")
 		return ErrNoSelection
 	}
-	return openAndPaste(config, desktop, selectedText)
+	return openAndPaste(config, desktop, selectedItem)
 }
 
-func openAndPaste(config Config, desktop Desktop, selectedText string) error {
-	// Keep the exact selection available even if browser automation fails.
-	if err := desktop.WriteClipboard(selectedText); err != nil {
-		_ = desktop.Notify("Ask AI", "Could not copy the selected text to the clipboard.")
+func openAndPaste(config Config, desktop Desktop, selectedItem ClipboardItem) error {
+	// Keep the exact selection or fallback item available even if browser automation fails.
+	if err := desktop.WriteClipboard(selectedItem); err != nil {
+		_ = desktop.Notify("Ask AI", "Could not restore the content to the clipboard.")
 		return fmt.Errorf("copy selection to clipboard: %w", err)
 	}
 
 	if err := desktop.OpenURL(config.URL); err != nil {
-		_ = desktop.Notify("Ask AI", "Could not open the AI chat. The selected text is on your clipboard.")
+		_ = desktop.Notify("Ask AI", "Could not open the AI chat. The selected content is on your clipboard.")
 		return fmt.Errorf("open AI chat: %w", err)
 	}
 
 	desktop.Sleep(config.PasteDelay)
 	if err := desktop.ReplaceDraft(config.Provider); err != nil {
-		_ = desktop.Notify("Ask AI", "Text injection failed. Paste the selected text from your clipboard.")
+		_ = desktop.Notify("Ask AI", "Content injection failed. Paste the selected content from your clipboard.")
 		return fmt.Errorf("paste selection: %w", err)
 	}
 	return nil
 }
 
-func captureSelection(desktop Desktop, previousClipboard string) (string, error) {
-	sentinel := fmt.Sprintf("ask-ai-selection-%d", time.Now().UnixNano())
+func captureSelection(desktop Desktop, previousClipboard ClipboardItem) (ClipboardItem, error) {
+	sentinel := textClipboardItem(fmt.Sprintf("ask-ai-selection-%d", time.Now().UnixNano()))
 	if err := desktop.WriteClipboard(sentinel); err != nil {
-		return "", fmt.Errorf("prepare clipboard: %w", err)
+		return ClipboardItem{}, fmt.Errorf("prepare clipboard: %w", err)
 	}
 	if err := desktop.CopySelection(); err != nil {
 		_ = desktop.WriteClipboard(previousClipboard)
-		return "", fmt.Errorf("copy selection: %w", err)
+		return ClipboardItem{}, fmt.Errorf("copy selection: %w", err)
 	}
 
 	for range capturePollAttempts {
-		text, err := desktop.ReadClipboard()
-		if err == nil && text != sentinel {
-			if strings.TrimSpace(text) == "" {
+		item, err := desktop.ReadClipboard()
+		if err == nil && !item.equal(sentinel) {
+			if item.empty() {
 				_ = desktop.WriteClipboard(previousClipboard)
-				return "", ErrNoSelection
+				return ClipboardItem{}, ErrNoSelection
 			}
-			return text, nil
+			return item, nil
 		}
 		desktop.Sleep(capturePollInterval)
 	}
 
 	_ = desktop.WriteClipboard(previousClipboard)
-	return "", ErrNoSelection
+	return ClipboardItem{}, ErrNoSelection
 }

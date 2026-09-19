@@ -9,21 +9,64 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"ask-ai-everywhere/internal/askai"
 )
 
 type System struct{}
 
 func New() *System { return &System{} }
 
-func (s *System) ReadClipboard() (string, error) {
-	output, err := exec.Command("wl-paste", "--no-newline", "--type", "text").Output()
-	return string(output), err
+func (s *System) ReadClipboard() (askai.ClipboardItem, error) {
+	typesOutput, err := exec.Command("wl-paste", "--list-types").Output()
+	if err != nil {
+		return askai.ClipboardItem{}, err
+	}
+	mimeType := chooseClipboardType(strings.Fields(string(typesOutput)))
+	if mimeType == "" {
+		return askai.ClipboardItem{}, fmt.Errorf("clipboard has no available MIME type")
+	}
+	data, err := exec.Command("wl-paste", "--no-newline", "--type", mimeType).Output()
+	return askai.ClipboardItem{MIMEType: mimeType, Data: data}, err
 }
 
-func (s *System) WriteClipboard(text string) error {
-	command := exec.Command("wl-copy", "--type", "text/plain;charset=utf-8")
-	command.Stdin = bytes.NewBufferString(text)
+func (s *System) WriteClipboard(item askai.ClipboardItem) error {
+	mimeType := item.MIMEType
+	if mimeType == "" {
+		mimeType = "text/plain;charset=utf-8"
+	}
+	command := exec.Command("wl-copy", "--type", mimeType)
+	command.Stdin = bytes.NewReader(item.Data)
 	return command.Run()
+}
+
+func chooseClipboardType(types []string) string {
+	for _, mimeType := range types {
+		if mimeType == "image/png" {
+			return mimeType
+		}
+	}
+	for _, mimeType := range types {
+		if strings.HasPrefix(mimeType, "image/") {
+			return mimeType
+		}
+	}
+	for _, preferred := range []string{"text/plain;charset=utf-8", "text/plain"} {
+		for _, mimeType := range types {
+			if mimeType == preferred {
+				return mimeType
+			}
+		}
+	}
+	for _, mimeType := range types {
+		if strings.HasPrefix(mimeType, "text/") {
+			return mimeType
+		}
+	}
+	if len(types) > 0 {
+		return types[0]
+	}
+	return ""
 }
 
 func (s *System) CopySelection() error {

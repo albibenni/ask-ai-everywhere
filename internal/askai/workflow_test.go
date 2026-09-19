@@ -1,6 +1,7 @@
 package askai
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 type fakeDesktop struct {
 	clipboard       string
+	clipboardImage  []byte
 	selectedText    string
 	copyErr         error
 	openErr         error
@@ -21,14 +23,48 @@ type fakeDesktop struct {
 	sleeps          []time.Duration
 }
 
-func (f *fakeDesktop) ReadClipboard() (string, error) { return f.clipboard, nil }
-func (f *fakeDesktop) WriteClipboard(text string) error {
-	f.clipboard = text
+func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
+	if f.clipboardImage != nil {
+		return ClipboardItem{MIMEType: "image/png", Data: append([]byte(nil), f.clipboardImage...)}, nil
+	}
+	return textClipboardItem(f.clipboard), nil
+}
+func (f *fakeDesktop) WriteClipboard(item ClipboardItem) error {
+	if strings.HasPrefix(item.MIMEType, "image/") {
+		f.clipboard = ""
+		f.clipboardImage = append([]byte(nil), item.Data...)
+		return nil
+	}
+	f.clipboard = string(item.Data)
+	f.clipboardImage = nil
 	return nil
+}
+
+func TestRunUsesCopiedImageWhenThereIsNoSelection(t *testing.T) {
+	image := []byte("\x89PNG\r\n\x1a\nimage data")
+	desktop := &fakeDesktop{clipboardImage: image}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if desktop.openedURL != "https://chatgpt.com/" {
+		t.Fatalf("opened URL = %q", desktop.openedURL)
+	}
+	if !desktop.pasted {
+		t.Fatal("image was not pasted")
+	}
+	if !bytes.Equal(desktop.clipboardImage, image) {
+		t.Fatalf("clipboard image = %q, want %q", desktop.clipboardImage, image)
+	}
+	if len(desktop.notifications) != 1 ||
+		!strings.Contains(desktop.notifications[0], "clipboard") {
+		t.Fatalf("notifications = %v", desktop.notifications)
+	}
 }
 func (f *fakeDesktop) CopySelection() error {
 	if f.copyErr == nil {
 		f.clipboard = f.selectedText
+		f.clipboardImage = nil
 	}
 	return f.copyErr
 }
