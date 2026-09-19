@@ -21,6 +21,7 @@ type fakeDesktop struct {
 	composer        string
 	notifications   []string
 	sleeps          []time.Duration
+	clipboardWrites []ClipboardItem
 }
 
 func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
@@ -30,6 +31,7 @@ func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
 	return textClipboardItem(f.clipboard), nil
 }
 func (f *fakeDesktop) WriteClipboard(item ClipboardItem) error {
+	f.clipboardWrites = append(f.clipboardWrites, item)
 	if strings.HasPrefix(item.MIMEType, "image/") {
 		f.clipboard = ""
 		f.clipboardImage = append([]byte(nil), item.Data...)
@@ -60,9 +62,12 @@ func TestRunUsesCopiedImageWhenThereIsNoSelection(t *testing.T) {
 		!strings.Contains(desktop.notifications[0], "clipboard") {
 		t.Fatalf("notifications = %v", desktop.notifications)
 	}
+	if len(desktop.clipboardWrites) != 0 {
+		t.Fatalf("clipboard writes = %d, want none", len(desktop.clipboardWrites))
+	}
 }
 func (f *fakeDesktop) CopySelection() error {
-	if f.copyErr == nil {
+	if f.copyErr == nil && f.selectedText != "" {
 		f.clipboard = f.selectedText
 		f.clipboardImage = nil
 	}

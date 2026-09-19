@@ -53,12 +53,12 @@ func Run(config Config, desktop Desktop) error {
 	previousClipboard, _ := desktop.ReadClipboard()
 	desktop.Sleep(config.ShortcutReleaseDelay)
 
-	selectedItem, err := captureSelection(desktop, previousClipboard)
+	_, err := captureSelection(desktop, previousClipboard)
 	if err != nil {
 		if errors.Is(err, ErrNoSelection) {
 			if !previousClipboard.empty() {
 				_ = desktop.Notify("Ask AI", "No text selected. Using the first (most recent) item in the clipboard.")
-				return openAndPaste(config, desktop, previousClipboard)
+				return openAndPaste(config, desktop)
 			}
 			_ = desktop.Notify("Ask AI", "No selected text was found. Nothing was opened.")
 		} else {
@@ -67,7 +67,7 @@ func Run(config Config, desktop Desktop) error {
 		return err
 	}
 
-	return openAndPaste(config, desktop, selectedItem)
+	return openAndPaste(config, desktop)
 }
 
 // RunFromClipboard opens content explicitly placed on the clipboard by an
@@ -78,16 +78,10 @@ func RunFromClipboard(config Config, desktop Desktop) error {
 		_ = desktop.Notify("Ask AI", "No copied content was found. Nothing was opened.")
 		return ErrNoSelection
 	}
-	return openAndPaste(config, desktop, selectedItem)
+	return openAndPaste(config, desktop)
 }
 
-func openAndPaste(config Config, desktop Desktop, selectedItem ClipboardItem) error {
-	// Keep the exact selection or fallback item available even if browser automation fails.
-	if err := desktop.WriteClipboard(selectedItem); err != nil {
-		_ = desktop.Notify("Ask AI", "Could not restore the content to the clipboard.")
-		return fmt.Errorf("copy selection to clipboard: %w", err)
-	}
-
+func openAndPaste(config Config, desktop Desktop) error {
 	if err := desktop.OpenURL(config.URL); err != nil {
 		_ = desktop.Notify("Ask AI", "Could not open the AI chat. The selected content is on your clipboard.")
 		return fmt.Errorf("open AI chat: %w", err)
@@ -102,18 +96,13 @@ func openAndPaste(config Config, desktop Desktop, selectedItem ClipboardItem) er
 }
 
 func captureSelection(desktop Desktop, previousClipboard ClipboardItem) (ClipboardItem, error) {
-	sentinel := textClipboardItem(fmt.Sprintf("ask-ai-selection-%d", time.Now().UnixNano()))
-	if err := desktop.WriteClipboard(sentinel); err != nil {
-		return ClipboardItem{}, fmt.Errorf("prepare clipboard: %w", err)
-	}
 	if err := desktop.CopySelection(); err != nil {
-		_ = desktop.WriteClipboard(previousClipboard)
 		return ClipboardItem{}, fmt.Errorf("copy selection: %w", err)
 	}
 
 	for range capturePollAttempts {
 		item, err := desktop.ReadClipboard()
-		if err == nil && !item.equal(sentinel) {
+		if err == nil && !item.equal(previousClipboard) {
 			if item.empty() {
 				_ = desktop.WriteClipboard(previousClipboard)
 				return ClipboardItem{}, ErrNoSelection
@@ -123,6 +112,5 @@ func captureSelection(desktop Desktop, previousClipboard ClipboardItem) (Clipboa
 		desktop.Sleep(capturePollInterval)
 	}
 
-	_ = desktop.WriteClipboard(previousClipboard)
 	return ClipboardItem{}, ErrNoSelection
 }
