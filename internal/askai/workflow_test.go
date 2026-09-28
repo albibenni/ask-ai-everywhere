@@ -9,22 +9,29 @@ import (
 )
 
 type fakeDesktop struct {
-	clipboard       string
-	clipboardImage  []byte
-	selectedText    string
-	copyErr         error
-	openErr         error
-	pasteErr        error
-	openedURL       string
-	pasted          bool
-	replaceProvider string
-	composer        string
-	notifications   []string
-	sleeps          []time.Duration
-	clipboardWrites []ClipboardItem
+	clipboard        string
+	clipboardImage   []byte
+	selectedText     string
+	copyErr          error
+	openErr          error
+	pasteErr         error
+	openedURL        string
+	pasted           bool
+	replaceProvider  string
+	composer         string
+	notifications    []string
+	sleeps           []time.Duration
+	clipboardWrites  []ClipboardItem
+	copyCalls        int
+	readErrAfterCopy error
+	clearOnCopy      bool
+	replaceMIME      string
 }
 
 func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
+	if f.copyCalls > 0 && f.readErrAfterCopy != nil {
+		return ClipboardItem{}, f.readErrAfterCopy
+	}
 	if f.clipboardImage != nil {
 		return ClipboardItem{MIMEType: "image/png", Data: append([]byte(nil), f.clipboardImage...)}, nil
 	}
@@ -65,8 +72,16 @@ func TestRunUsesCopiedImageWhenThereIsNoSelection(t *testing.T) {
 	if len(desktop.clipboardWrites) != 0 {
 		t.Fatalf("clipboard writes = %d, want none", len(desktop.clipboardWrites))
 	}
+	if desktop.copyCalls != 1 {
+		t.Fatalf("CopySelection() calls = %d, want one", desktop.copyCalls)
+	}
 }
 func (f *fakeDesktop) CopySelection() error {
+	f.copyCalls++
+	if f.clearOnCopy {
+		f.clipboard = ""
+		f.clipboardImage = nil
+	}
 	if f.copyErr == nil && f.selectedText != "" {
 		f.clipboard = f.selectedText
 		f.clipboardImage = nil
@@ -77,7 +92,8 @@ func (f *fakeDesktop) OpenURL(url string) error {
 	f.openedURL = url
 	return f.openErr
 }
-func (f *fakeDesktop) ReplaceDraft(provider string) error {
+func (f *fakeDesktop) ReplaceDraft(provider, mimeType string) error {
+	f.replaceMIME = mimeType
 	f.pasted = true
 	f.replaceProvider = provider
 	f.composer = f.clipboard
@@ -137,6 +153,48 @@ func TestRunUsesMostRecentClipboardItemWhenThereIsNoSelection(t *testing.T) {
 		!strings.Contains(desktop.notifications[0], "first") ||
 		!strings.Contains(desktop.notifications[0], "clipboard") {
 		t.Fatalf("notifications = %v", desktop.notifications)
+	}
+}
+
+func TestRunRestoresClipboardWhenSelectionCaptureTimesOut(t *testing.T) {
+	desktop := &fakeDesktop{
+		clipboard:        "previous",
+		readErrAfterCopy: errors.New("clipboard temporarily unavailable"),
+	}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(desktop.clipboardWrites) != 1 {
+		t.Fatalf("clipboard writes = %d, want one restoration", len(desktop.clipboardWrites))
+	}
+	if got := string(desktop.clipboardWrites[0].Data); got != "previous" {
+		t.Fatalf("restored clipboard = %q, want %q", got, "previous")
+	}
+	if desktop.composer != "previous" {
+		t.Fatalf("composer = %q, want %q", desktop.composer, "previous")
+	}
+}
+
+func TestRunRestoresImageWhenSelectionCaptureInvalidatesClipboard(t *testing.T) {
+	image := []byte("\x89PNG\r\n\x1a\nimage data")
+	desktop := &fakeDesktop{
+		clipboardImage:   image,
+		clearOnCopy:      true,
+		readErrAfterCopy: errors.New("clipboard temporarily unavailable"),
+	}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(desktop.clipboardWrites) != 1 {
+		t.Fatalf("clipboard writes = %d, want one restoration", len(desktop.clipboardWrites))
+	}
+	if !bytes.Equal(desktop.clipboardImage, image) {
+		t.Fatalf("clipboard image = %q, want %q", desktop.clipboardImage, image)
+	}
+	if desktop.replaceMIME != "image/png" {
+		t.Fatalf("paste MIME type = %q, want image/png", desktop.replaceMIME)
 	}
 }
 

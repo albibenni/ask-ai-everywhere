@@ -33,7 +33,7 @@ func (s *System) OpenURL(url string) error {
 	return exec.Command("open", url).Run()
 }
 
-func (s *System) ReplaceDraft(provider string) error {
+func (s *System) ReplaceDraft(provider, _ string) error {
 	composerFocus := ""
 	if provider == "kimi" {
 		composerFocus = `keystroke "k" using command down
