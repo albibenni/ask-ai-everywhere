@@ -27,3 +27,11 @@ func TestChooseClipboardTypeUsesUTF8PlainTextForTextClipboard(t *testing.T) {
 		t.Fatalf("chooseClipboardType() = %q, want text/plain;charset=utf-8", got)
 	}
 }
+
+func TestChooseClipboardTypeRejectsPrivateClipboardFormats(t *testing.T) {
+	types := []string{"org.webkitgtk.WebKit.custom-pasteboard-data", "SAVE_TARGETS"}
+
+	if got := chooseClipboardType(types); got != "" {
+		t.Fatalf("chooseClipboardType() = %q, want no supported type", got)
+	}
+}

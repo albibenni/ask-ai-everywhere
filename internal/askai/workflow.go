@@ -37,6 +37,10 @@ func (item ClipboardItem) equal(other ClipboardItem) bool {
 	return item.MIMEType == other.MIMEType && bytes.Equal(item.Data, other.Data)
 }
 
+func (item ClipboardItem) pasteable() bool {
+	return strings.HasPrefix(item.MIMEType, "text/") || strings.HasPrefix(item.MIMEType, "image/")
+}
+
 // Desktop contains the operating-system actions needed by the workflow.
 type Desktop interface {
 	ReadClipboard() (ClipboardItem, error)
@@ -105,7 +109,7 @@ func captureSelection(desktop Desktop, previousClipboard ClipboardItem) (Clipboa
 		item, err := desktop.ReadClipboard()
 		clipboardStillAvailable = err == nil && item.equal(previousClipboard)
 		if err == nil && !item.equal(previousClipboard) {
-			if item.empty() {
+			if item.empty() || !item.pasteable() {
 				_ = desktop.WriteClipboard(previousClipboard)
 				return ClipboardItem{}, ErrNoSelection
 			}

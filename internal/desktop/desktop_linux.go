@@ -63,9 +63,6 @@ func chooseClipboardType(types []string) string {
 			return mimeType
 		}
 	}
-	if len(types) > 0 {
-		return types[0]
-	}
 	return ""
 }
 

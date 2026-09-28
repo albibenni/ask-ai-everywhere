@@ -25,12 +25,20 @@ type fakeDesktop struct {
 	copyCalls        int
 	readErrAfterCopy error
 	clearOnCopy      bool
+	afterCopyItem    *ClipboardItem
+	clipboardItem    *ClipboardItem
 	replaceMIME      string
 }
 
 func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
 	if f.copyCalls > 0 && f.readErrAfterCopy != nil {
 		return ClipboardItem{}, f.readErrAfterCopy
+	}
+	if f.clipboardItem != nil {
+		return ClipboardItem{
+			MIMEType: f.clipboardItem.MIMEType,
+			Data:     append([]byte(nil), f.clipboardItem.Data...),
+		}, nil
 	}
 	if f.clipboardImage != nil {
 		return ClipboardItem{MIMEType: "image/png", Data: append([]byte(nil), f.clipboardImage...)}, nil
@@ -39,6 +47,7 @@ func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
 }
 func (f *fakeDesktop) WriteClipboard(item ClipboardItem) error {
 	f.clipboardWrites = append(f.clipboardWrites, item)
+	f.clipboardItem = nil
 	if strings.HasPrefix(item.MIMEType, "image/") {
 		f.clipboard = ""
 		f.clipboardImage = append([]byte(nil), item.Data...)
@@ -81,6 +90,14 @@ func (f *fakeDesktop) CopySelection() error {
 	if f.clearOnCopy {
 		f.clipboard = ""
 		f.clipboardImage = nil
+	}
+	if f.afterCopyItem != nil {
+		f.clipboard = ""
+		f.clipboardImage = nil
+		f.clipboardItem = &ClipboardItem{
+			MIMEType: f.afterCopyItem.MIMEType,
+			Data:     append([]byte(nil), f.afterCopyItem.Data...),
+		}
 	}
 	if f.copyErr == nil && f.selectedText != "" {
 		f.clipboard = f.selectedText
@@ -189,6 +206,30 @@ func TestRunRestoresImageWhenSelectionCaptureInvalidatesClipboard(t *testing.T) 
 	}
 	if len(desktop.clipboardWrites) != 1 {
 		t.Fatalf("clipboard writes = %d, want one restoration", len(desktop.clipboardWrites))
+	}
+	if !bytes.Equal(desktop.clipboardImage, image) {
+		t.Fatalf("clipboard image = %q, want %q", desktop.clipboardImage, image)
+	}
+	if desktop.replaceMIME != "image/png" {
+		t.Fatalf("paste MIME type = %q, want image/png", desktop.replaceMIME)
+	}
+}
+
+func TestRunRestoresImageWhenCopyProducesPrivateClipboardData(t *testing.T) {
+	image := []byte("\x89PNG\r\n\x1a\nimage data")
+	desktop := &fakeDesktop{
+		clipboardImage: image,
+		afterCopyItem: &ClipboardItem{
+			MIMEType: "org.webkitgtk.WebKit.custom-pasteboard-data",
+			Data:     []byte("private browser payload"),
+		},
+	}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(desktop.clipboardWrites) != 1 {
+		t.Fatalf("clipboard writes = %d, want one image restoration", len(desktop.clipboardWrites))
 	}
 	if !bytes.Equal(desktop.clipboardImage, image) {
 		t.Fatalf("clipboard image = %q, want %q", desktop.clipboardImage, image)
