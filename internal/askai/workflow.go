@@ -11,8 +11,9 @@ import (
 var ErrNoSelection = errors.New("no text selection was captured")
 
 const (
-	capturePollInterval = 25 * time.Millisecond
-	capturePollAttempts = 20
+	capturePollInterval  = 25 * time.Millisecond
+	capturePollAttempts  = 20
+	clipboardSettleDelay = 150 * time.Millisecond
 )
 
 // ClipboardItem is one clipboard representation that can be restored without
@@ -41,6 +42,10 @@ func (item ClipboardItem) pasteable() bool {
 	return strings.HasPrefix(item.MIMEType, "text/") || strings.HasPrefix(item.MIMEType, "image/")
 }
 
+func (item ClipboardItem) image() bool {
+	return strings.HasPrefix(item.MIMEType, "image/")
+}
+
 // Desktop contains the operating-system actions needed by the workflow.
 type Desktop interface {
 	ReadClipboard() (ClipboardItem, error)
@@ -56,6 +61,10 @@ type Desktop interface {
 func Run(config Config, desktop Desktop) error {
 	previousClipboard, _ := desktop.ReadClipboard()
 	desktop.Sleep(config.ShortcutReleaseDelay)
+	if previousClipboard.image() && !previousClipboard.empty() {
+		_ = desktop.Notify("Ask AI", "Using the current image from the clipboard.")
+		return openAndPaste(config, desktop, previousClipboard)
+	}
 
 	selectedItem, err := captureSelection(desktop, previousClipboard)
 	if err != nil {
@@ -92,6 +101,13 @@ func openAndPaste(config Config, desktop Desktop, selectedItem ClipboardItem) er
 	}
 
 	desktop.Sleep(config.PasteDelay)
+	if selectedItem.image() {
+		if err := desktop.WriteClipboard(selectedItem); err != nil {
+			_ = desktop.Notify("Ask AI", "Could not prepare the image clipboard for injection.")
+			return fmt.Errorf("prepare image clipboard: %w", err)
+		}
+		desktop.Sleep(clipboardSettleDelay)
+	}
 	if err := desktop.ReplaceDraft(config.Provider, selectedItem.MIMEType); err != nil {
 		_ = desktop.Notify("Ask AI", "Content injection failed. Paste the selected content from your clipboard.")
 		return fmt.Errorf("paste selection: %w", err)

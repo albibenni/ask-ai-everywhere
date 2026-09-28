@@ -101,16 +101,12 @@ func shortcutState(key, state string) string {
 	return fmt.Sprintf(`hl.dsp.send_key_state({ mods = "CTRL", key = %q, state = %q })`, key, state)
 }
 
-func replaceDraftArguments(provider, mimeType string) []string {
+func replaceDraftArguments(provider, _ string) []string {
 	arguments := make([]string, 0, 16)
 	if provider == "kimi" {
 		arguments = append(arguments, "-M", "ctrl", "-k", "k", "-m", "ctrl", "-s", "100")
 	}
-	arguments = append(arguments, "-M", "ctrl", "-k", "a")
-	if strings.HasPrefix(mimeType, "image/") {
-		return append(arguments, "-m", "ctrl", "-s", "50", "-M", "shift", "-k", "Insert", "-m", "shift")
-	}
-	return append(arguments, "-s", "50", "-k", "v", "-m", "ctrl")
+	return append(arguments, "-M", "ctrl", "-k", "a", "-s", "50", "-k", "v", "-m", "ctrl")
 }
 
 func activeWindowIsTerminal(windowJSON []byte) bool {

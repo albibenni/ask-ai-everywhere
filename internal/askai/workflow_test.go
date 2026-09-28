@@ -28,6 +28,7 @@ type fakeDesktop struct {
 	afterCopyItem    *ClipboardItem
 	clipboardItem    *ClipboardItem
 	replaceMIME      string
+	events           []string
 }
 
 func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
@@ -46,6 +47,7 @@ func (f *fakeDesktop) ReadClipboard() (ClipboardItem, error) {
 	return textClipboardItem(f.clipboard), nil
 }
 func (f *fakeDesktop) WriteClipboard(item ClipboardItem) error {
+	f.events = append(f.events, "write")
 	f.clipboardWrites = append(f.clipboardWrites, item)
 	f.clipboardItem = nil
 	if strings.HasPrefix(item.MIMEType, "image/") {
@@ -78,11 +80,14 @@ func TestRunUsesCopiedImageWhenThereIsNoSelection(t *testing.T) {
 		!strings.Contains(desktop.notifications[0], "clipboard") {
 		t.Fatalf("notifications = %v", desktop.notifications)
 	}
-	if len(desktop.clipboardWrites) != 0 {
-		t.Fatalf("clipboard writes = %d, want none", len(desktop.clipboardWrites))
+	if len(desktop.clipboardWrites) != 1 {
+		t.Fatalf("clipboard writes = %d, want one image-only refresh", len(desktop.clipboardWrites))
 	}
-	if desktop.copyCalls != 1 {
-		t.Fatalf("CopySelection() calls = %d, want one", desktop.copyCalls)
+	if got := strings.Join(desktop.events, ","); got != "open,write,paste" {
+		t.Fatalf("event order = %q, want open,write,paste", got)
+	}
+	if desktop.copyCalls != 0 {
+		t.Fatalf("CopySelection() calls = %d, want none for an active image", desktop.copyCalls)
 	}
 }
 func (f *fakeDesktop) CopySelection() error {
@@ -106,10 +111,12 @@ func (f *fakeDesktop) CopySelection() error {
 	return f.copyErr
 }
 func (f *fakeDesktop) OpenURL(url string) error {
+	f.events = append(f.events, "open")
 	f.openedURL = url
 	return f.openErr
 }
 func (f *fakeDesktop) ReplaceDraft(provider, mimeType string) error {
+	f.events = append(f.events, "paste")
 	f.replaceMIME = mimeType
 	f.pasted = true
 	f.replaceProvider = provider
@@ -193,16 +200,17 @@ func TestRunRestoresClipboardWhenSelectionCaptureTimesOut(t *testing.T) {
 	}
 }
 
-func TestRunRestoresImageWhenSelectionCaptureInvalidatesClipboard(t *testing.T) {
+func TestCaptureSelectionRestoresImageWhenClipboardBecomesUnavailable(t *testing.T) {
 	image := []byte("\x89PNG\r\n\x1a\nimage data")
 	desktop := &fakeDesktop{
-		clipboardImage:   image,
 		clearOnCopy:      true,
 		readErrAfterCopy: errors.New("clipboard temporarily unavailable"),
 	}
+	previousClipboard := ClipboardItem{MIMEType: "image/png", Data: image}
 
-	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
-		t.Fatalf("Run() error = %v", err)
+	_, err := captureSelection(desktop, previousClipboard)
+	if !errors.Is(err, ErrNoSelection) {
+		t.Fatalf("captureSelection() error = %v, want ErrNoSelection", err)
 	}
 	if len(desktop.clipboardWrites) != 1 {
 		t.Fatalf("clipboard writes = %d, want one restoration", len(desktop.clipboardWrites))
@@ -210,32 +218,27 @@ func TestRunRestoresImageWhenSelectionCaptureInvalidatesClipboard(t *testing.T) 
 	if !bytes.Equal(desktop.clipboardImage, image) {
 		t.Fatalf("clipboard image = %q, want %q", desktop.clipboardImage, image)
 	}
-	if desktop.replaceMIME != "image/png" {
-		t.Fatalf("paste MIME type = %q, want image/png", desktop.replaceMIME)
-	}
 }
 
-func TestRunRestoresImageWhenCopyProducesPrivateClipboardData(t *testing.T) {
+func TestCaptureSelectionRestoresImageWhenCopyProducesPrivateClipboardData(t *testing.T) {
 	image := []byte("\x89PNG\r\n\x1a\nimage data")
 	desktop := &fakeDesktop{
-		clipboardImage: image,
 		afterCopyItem: &ClipboardItem{
 			MIMEType: "org.webkitgtk.WebKit.custom-pasteboard-data",
 			Data:     []byte("private browser payload"),
 		},
 	}
+	previousClipboard := ClipboardItem{MIMEType: "image/png", Data: image}
 
-	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
-		t.Fatalf("Run() error = %v", err)
+	_, err := captureSelection(desktop, previousClipboard)
+	if !errors.Is(err, ErrNoSelection) {
+		t.Fatalf("captureSelection() error = %v, want ErrNoSelection", err)
 	}
 	if len(desktop.clipboardWrites) != 1 {
 		t.Fatalf("clipboard writes = %d, want one image restoration", len(desktop.clipboardWrites))
 	}
 	if !bytes.Equal(desktop.clipboardImage, image) {
 		t.Fatalf("clipboard image = %q, want %q", desktop.clipboardImage, image)
-	}
-	if desktop.replaceMIME != "image/png" {
-		t.Fatalf("paste MIME type = %q, want image/png", desktop.replaceMIME)
 	}
 }
 
