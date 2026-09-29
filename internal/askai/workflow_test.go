@@ -86,8 +86,29 @@ func TestRunUsesCopiedImageWhenThereIsNoSelection(t *testing.T) {
 	if got := strings.Join(desktop.events, ","); got != "open,write,paste" {
 		t.Fatalf("event order = %q, want open,write,paste", got)
 	}
-	if desktop.copyCalls != 0 {
-		t.Fatalf("CopySelection() calls = %d, want none for an active image", desktop.copyCalls)
+	if desktop.copyCalls != 1 {
+		t.Fatalf("CopySelection() calls = %d, want one selection attempt before image fallback", desktop.copyCalls)
+	}
+}
+
+func TestRunPrefersNewTextSelectionOverPreviousImageClipboard(t *testing.T) {
+	image := []byte("\x89PNG\r\n\x1a\nprevious image")
+	desktop := &fakeDesktop{
+		clipboardImage: image,
+		selectedText:   "Selected text wins",
+	}
+
+	if err := Run(Config{URL: "https://chatgpt.com/"}, desktop); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if desktop.copyCalls != 1 {
+		t.Fatalf("CopySelection() calls = %d, want one", desktop.copyCalls)
+	}
+	if desktop.composer != "Selected text wins" {
+		t.Fatalf("composer = %q, want selected text", desktop.composer)
+	}
+	if len(desktop.clipboardWrites) != 0 {
+		t.Fatalf("clipboard writes = %d, want none", len(desktop.clipboardWrites))
 	}
 }
 func (f *fakeDesktop) CopySelection() error {

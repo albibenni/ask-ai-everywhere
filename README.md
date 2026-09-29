@@ -22,8 +22,9 @@ selection remains on the clipboard for a manual paste.
 
 If no text is selected and the clipboard contains content, a desktop notification
 warns that the first (most recent) clipboard item will be used, then that item is
-pasted into the draft. On Wayland this includes images and preserves their MIME
-type and raw bytes. The utility reads the current clipboard value; it does not
+pasted into the draft. This includes images on Wayland and macOS. Wayland
+preserves the image MIME type and raw bytes; macOS reads and restores PNG, TIFF,
+or JPEG pasteboard representations. The utility reads the current clipboard value; it does not
 inspect a clipboard manager's full history. If neither source contains content,
 it notifies and stops without opening a browser tab. If the browser or paste
 command reports a failure, the selected or clipboard content stays available for
@@ -60,8 +61,9 @@ selected terminal text is captured without interrupting the shell.
 
 ### macOS
 
-The CLI uses the built-in `pbcopy`, `pbpaste`, `open`, and `osascript` commands.
-Grant Accessibility access to the application that launches `ask-ai` so
+The CLI uses built-in `open` and `osascript` commands. It uses AppKit through
+JavaScript for Automation to preserve image clipboard data, and `pbcopy` for
+plain text writes. Grant Accessibility access to the application that launches `ask-ai` so
 AppleScript can simulate Command-C and Command-V:
 
 1. Open **System Settings → Privacy & Security → Accessibility**.
