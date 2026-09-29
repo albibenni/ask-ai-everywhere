@@ -34,6 +34,14 @@ if git rev-parse --quiet --verify "refs/tags/$release_version" >/dev/null; then
   echo "release: tag $release_version already exists" >&2
   exit 1
 fi
+if ! remote_tag=$(git ls-remote --tags origin "refs/tags/$release_version"); then
+  echo "release: could not check whether $release_version exists on origin" >&2
+  exit 1
+fi
+if [[ -n "$remote_tag" ]]; then
+  echo "release: tag $release_version already exists on origin" >&2
+  exit 1
+fi
 
 commit=$(git rev-parse --short HEAD)
 read -r -p "Tag $commit as $release_version and push main plus the tag? [y/N] " confirmation
@@ -51,6 +59,10 @@ if [[ -n $(git status --porcelain) ]]; then
 fi
 
 git tag --annotate "$release_version" --message "Release $release_version"
-git push --atomic origin main "$release_version"
+if ! git push --atomic origin main "$release_version"; then
+  git tag --delete "$release_version"
+  echo "release: push failed; deleted local tag $release_version" >&2
+  exit 1
+fi
 
 echo "Released $release_version from $commit."
