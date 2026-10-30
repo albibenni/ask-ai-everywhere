@@ -2,6 +2,7 @@
 
 Open selected text as an unsent draft in a fresh consumer-AI browser tab. The
 same command works from an Omarchy/Hyprland or macOS/AeroSpace keybinding.
+Windows includes a hidden shortcut launcher; screenshot drafts use manual paste.
 
 Ask AI Everywhere does not use an API key, put selected text in a URL, or submit
 the prompt. It copies the selection locally, opens the configured provider in
@@ -73,6 +74,36 @@ Without Accessibility permission, selection capture or paste will fail safely
 and produce a notification. Selection capture must succeed before a browser tab
 is opened.
 
+### Windows
+
+The Windows adapter uses native clipboard and keyboard APIs and opens the
+configured provider through the default browser. Windows PowerShell supplies
+best-effort toast notifications. No AutoHotkey, WSL, or extra clipboard utility
+is required. Use the hidden `ask-ai-shortcut.exe` for the global shortcut so a
+console window does not steal focus before the selection is copied.
+
+Selected text is copied with Ctrl+C; Windows Terminal, classic console windows,
+and mintty use Ctrl+Insert to avoid interrupting a running command. Shortcut
+modifiers must be released before Copy or Paste. Text injection is attempted
+only while a recognized browser window (Chromium browsers or Firefox) is focused.
+If focus or injection fails, paste the clipboard into the chat manually. Windows
+blocks input injection into applications running at a higher integrity level;
+use ordinary, non-administrator applications for the normal workflow. See
+[Microsoft's SendInput documentation](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput).
+
+**Screenshots use manual paste on Windows.** Copy a screenshot with Snipping
+Tool / Win+Shift+S, then invoke the shortcut. The chat opens and you paste with
+Ctrl+V. PNG and native DIB/DIBV5 image formats take priority over clipboard text.
+The helper skips Copy and preserves all original clipboard representations;
+it does not convert the screenshot to text, clear the clipboard, or submit it.
+Print Screen also works when your Windows capture settings put an image on the
+clipboard. Finish the capture before invoking the shortcut. This manual-paste
+policy is specific to Windows; Linux and macOS retain their existing behavior.
+
+Windows builds are cross-compiled and have automated test coverage; interactive
+desktop behavior still needs validation in a real Windows session. See the
+Windows shortcut setup and manual checks below.
+
 ## Build and install
 
 Go 1.24 or newer is required to build. The resulting executable is standalone;
@@ -82,6 +113,23 @@ Go is not needed at runtime.
 make check
 make install
 ```
+
+For a Windows checkout, the installation target is:
+
+```powershell
+make install-win
+```
+
+This target requires Go and GNU Make and runs `go install` with the same embedded
+version as the other build targets. It installs `ask-ai.exe` and the GUI-subsystem
+`ask-ai-shortcut.exe` launcher into `GOBIN`, or
+`bin` under `GOPATH` when `GOBIN` is unset (normally `%USERPROFILE%\go\bin`).
+Add that directory to `PATH` and use `ask-ai provider` for provider management.
+The target does not install the Unix helper symlink or Bash completions.
+
+On Windows, confirm installation with `ask-ai -version`. Configure the global
+shortcut separately using the instructions below. For troubleshooting, use
+`ask-ai` directly in a terminal; reserve `ask-ai-shortcut` for hidden launches.
 
 Confirm the installation:
 
@@ -104,7 +152,7 @@ explicit override when needed:
 make build VERSION=v1.0.0
 ```
 
-Build Linux and macOS binaries for Intel and ARM:
+Build Linux, macOS, and Windows binaries for Intel and ARM:
 
 ```sh
 make cross-build VERSION=v1.0.0
@@ -196,9 +244,11 @@ ask-ai-provider custom https://example.com/chat
 
 Running `ask-ai-provider` without arguments opens the same interactive picker.
 
-Both commands update the configured file atomically. If that file is a symlink,
-its target is updated without replacing the symlink. In this setup, changes are
-written directly to the tracked file under `~/dotfiles/ask-ai`.
+Both commands write a temporary file and replace the configured file (an atomic
+rename on Unix; [Go does not guarantee atomic rename on Windows](https://pkg.go.dev/os#Rename)).
+If that file is a symlink, its target is updated without replacing the symlink.
+In this setup, changes are written directly to the tracked file under
+`~/dotfiles/ask-ai`.
 
 ### Bash completion
 
@@ -274,6 +324,50 @@ alt-shift-a = 'exec-and-forget $HOME/.local/bin/ask-ai'
 
 Choose any unused binding. AeroSpace runs `exec-and-forget` through Bash; see
 the official [AeroSpace command reference](https://nikitabobko.github.io/AeroSpace/commands#exec-and-forget).
+
+## Windows shortcut
+
+After `make install-win`, add the Go binary directory to `PATH` and start a new
+PowerShell session. Create a desktop shortcut with an unused Ctrl+Alt binding:
+
+```powershell
+$launcher = (Get-Command ask-ai-shortcut.exe -ErrorAction Stop).Source
+$desktop = [Environment]::GetFolderPath('Desktop')
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut((Join-Path $desktop 'Ask AI.lnk'))
+$shortcut.TargetPath = $launcher
+$shortcut.WorkingDirectory = Split-Path $launcher
+$shortcut.Hotkey = 'CTRL+ALT+A'
+$shortcut.Description = 'Open selection or clipboard in AI chat'
+$shortcut.Save()
+```
+
+Keep this shortcut on the desktop so Windows can register its hotkey. Select
+text in another application, press Ctrl+Alt+A, and release the keys. The launcher
+starts the CLI invisibly and ignores overlapping shortcut invocations. It
+forwards CLI flags if you add them to the shortcut's Arguments property.
+Do not launch `ask-ai provider` through the hidden launcher; use a terminal
+for interactive commands.
+
+The config remains at `%USERPROFILE%\.config\ask-ai\config.json`, with
+`ASK_AI_CONFIG` and `-config` overrides available. Hidden-launch errors are
+written to `%LOCALAPPDATA%\ask-ai\shortcut.log` (replaced on each invocation).
+Toast notifications depend on Windows notification settings.
+
+Before relying on the shortcut, validate these behaviors in your Windows session:
+
+1. Select Unicode text in an editor; the shortcut should open an unsent text
+   draft. Repeat from Windows Terminal and confirm it does not interrupt a
+   running command. Test your browsers and providers with a restored draft.
+2. Capture with Win+Shift+S / Snipping Tool (and Print Screen if configured).
+   Invoke the shortcut, then Ctrl+V in the chat. The screenshot should attach
+   without being submitted, including when the clipboard also offers text.
+3. With no selected text, test clipboard fallback and then an empty clipboard.
+   An empty clipboard should stop without opening the browser.
+4. Change focus during the page-load delay. Text should remain available for
+   manual paste when the browser is not focused. Screenshot paste stays manual.
+5. Run `ask-ai provider` in a terminal and change the provider twice, confirming
+   that settings are saved and the shortcut opens the chosen destination.
 
 ## Troubleshooting
 

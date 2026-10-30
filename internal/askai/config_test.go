@@ -3,6 +3,7 @@ package askai
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +38,9 @@ func TestSetProviderUpdatesSymlinkTargetAndPreservesOtherSettings(t *testing.T) 
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("creating symlinks requires Developer Mode or elevated privileges on Windows: %v", err)
+		}
 		t.Fatal(err)
 	}
 

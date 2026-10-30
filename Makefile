@@ -3,12 +3,17 @@ COMMAND := ./cmd/ask-ai
 BUILD_DIR := bin
 INSTALL_PREFIX ?= $(HOME)/.local
 COMPLETION_DIR ?= $(INSTALL_PREFIX)/share/bash-completion/completions
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+ifeq ($(OS),Windows_NT)
+NULL_DEVICE := NUL
+else
+NULL_DEVICE := /dev/null
+endif
+VERSION ?= $(shell git describe --tags --always --dirty 2>$(NULL_DEVICE) || echo dev)
 GO_LDFLAGS := -X main.version=$(VERSION)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help version fmt test vet check build completion install cross-build release clean
+.PHONY: help version fmt test vet check build completion install install-win cross-build release clean
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -42,12 +47,24 @@ install: build completion ## Install CLI, helper, and Bash completion
 	install -m 0644 $(BUILD_DIR)/$(BINARY).bash $(DESTDIR)$(COMPLETION_DIR)/$(BINARY)
 	ln -sfn $(BINARY) $(DESTDIR)$(COMPLETION_DIR)/$(BINARY)-provider
 
-cross-build: ## Build Linux and macOS release binaries
+install-win: ## Install the CLI and hidden shortcut launcher on Windows using go install
+ifeq ($(OS),Windows_NT)
+	go install -ldflags "$(GO_LDFLAGS)" $(COMMAND)
+	go install -ldflags "-H=windowsgui" ./cmd/ask-ai-shortcut
+else
+	$(error install-win must be run on Windows; use make install on Linux or macOS)
+endif
+
+cross-build: ## Build Linux, macOS, and Windows release binaries
 	mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-amd64 $(COMMAND)
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-arm64 $(COMMAND)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-amd64 $(COMMAND)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-darwin-arm64 $(COMMAND)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-windows-amd64.exe $(COMMAND)
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "$(GO_LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-windows-arm64.exe $(COMMAND)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o $(BUILD_DIR)/$(BINARY)-shortcut-windows-amd64.exe ./cmd/ask-ai-shortcut
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "-H=windowsgui" -o $(BUILD_DIR)/$(BINARY)-shortcut-windows-arm64.exe ./cmd/ask-ai-shortcut
 
 release: ## Prompt for a version, verify, tag, and push a release
 	@./scripts/release.sh
