@@ -15,10 +15,52 @@ if [[ "$branch" != "main" ]]; then
   exit 1
 fi
 
-current_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+# Fetch the branch without importing tags: a failed release may have left a
+# local tag that conflicts with an already published remote tag.
+if ! git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main; then
+  echo "release: could not refresh origin/main" >&2
+  exit 1
+fi
+if ! git merge-base --is-ancestor refs/remotes/origin/main HEAD; then
+  echo "release: main is behind or has diverged from origin/main; integrate the remote commits before releasing" >&2
+  exit 1
+fi
+if ! remote_tags=$(git ls-remote --tags --refs origin 'refs/tags/v*'); then
+  echo "release: could not read release tags from origin" >&2
+  exit 1
+fi
+
+# The nearest tag can be older than another published release. Find the highest
+# stable version across local and remote tags, without replacing local refs.
+tag_candidates=$(git tag --list 'v[0-9]*')
+while read -r object ref; do
+  if [[ -n "$ref" ]]; then
+    tag_candidates+=$'\n'"${ref#refs/tags/}"
+  fi
+done <<< "$remote_tags"
+
+highest_major=-1
+highest_minor=-1
+highest_patch=-1
+while IFS= read -r candidate; do
+  if [[ ! "$candidate" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    continue
+  fi
+  major=$((10#${BASH_REMATCH[1]}))
+  minor=$((10#${BASH_REMATCH[2]}))
+  patch=$((10#${BASH_REMATCH[3]}))
+  if (( major > highest_major ||
+        (major == highest_major && minor > highest_minor) ||
+        (major == highest_major && minor == highest_minor && patch > highest_patch) )); then
+    highest_major=$major
+    highest_minor=$minor
+    highest_patch=$patch
+  fi
+done <<< "$tag_candidates"
+
 suggested_version="v0.1.0"
-if [[ "$current_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-  suggested_version="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+if (( highest_major >= 0 )); then
+  suggested_version="v${highest_major}.${highest_minor}.$((highest_patch + 1))"
 fi
 
 read -r -p "Release version [$suggested_version]: " release_version
@@ -32,6 +74,14 @@ if [[ ! "$release_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; th
 fi
 if git rev-parse --quiet --verify "refs/tags/$release_version" >/dev/null; then
   echo "release: tag $release_version already exists" >&2
+  exit 1
+fi
+if ! remote_tag=$(git ls-remote --tags origin "refs/tags/$release_version"); then
+  echo "release: could not check whether $release_version exists on origin" >&2
+  exit 1
+fi
+if [[ -n "$remote_tag" ]]; then
+  echo "release: tag $release_version already exists on origin" >&2
   exit 1
 fi
 
@@ -51,6 +101,10 @@ if [[ -n $(git status --porcelain) ]]; then
 fi
 
 git tag --annotate "$release_version" --message "Release $release_version"
-git push --atomic origin main "$release_version"
+if ! git push --atomic origin main "$release_version"; then
+  git tag --delete "$release_version"
+  echo "release: push failed; deleted local tag $release_version" >&2
+  exit 1
+fi
 
 echo "Released $release_version from $commit."

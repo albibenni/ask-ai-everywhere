@@ -17,6 +17,7 @@ import (
 
 type System struct {
 	clipboardReadErr error
+	clipboardImage   bool
 }
 
 var _ askai.Desktop = (*System)(nil)
@@ -49,6 +50,11 @@ func (s *System) CopySelection() error {
 	// do not risk overwriting an unreadable screenshot with a simulated Copy.
 	if s.clipboardReadErr != nil {
 		return fmt.Errorf("could not inspect clipboard safely: %w", s.clipboardReadErr)
+	}
+	if s.clipboardImage {
+		// Preserve every screenshot representation while the shared workflow
+		// attempts selection capture before falling back to the clipboard.
+		return nil
 	}
 	source := windows.GetForegroundWindow()
 	if err := waitForWindowsModifiers(); err != nil {

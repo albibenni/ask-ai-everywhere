@@ -40,6 +40,7 @@ func (s *System) ReadClipboard() (item askai.ClipboardItem, err error) {
 		return err
 	})
 	s.clipboardReadErr = err
+	s.clipboardImage = err == nil && strings.HasPrefix(item.MIMEType, "image/") && len(item.Data) != 0
 	return item, err
 }
 

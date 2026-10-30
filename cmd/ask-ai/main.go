@@ -57,6 +57,17 @@ func run() int {
 	}
 
 	platform := desktop.New()
+	releaseRunLock, err := askai.AcquireRunLock()
+	if errors.Is(err, askai.ErrAlreadyRunning) {
+		_ = platform.Notify("Ask AI", "A chat is already being opened.")
+		return 0
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ask-ai: acquire run lock:", err)
+		return 1
+	}
+	defer releaseRunLock()
+
 	config, err := askai.LoadConfig(*configPath)
 	if err != nil {
 		_ = platform.Notify("Ask AI", "Configuration is invalid. Check config.json.")

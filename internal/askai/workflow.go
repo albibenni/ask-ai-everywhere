@@ -61,10 +61,6 @@ type Desktop interface {
 func Run(config Config, desktop Desktop) error {
 	previousClipboard, _ := desktop.ReadClipboard()
 	desktop.Sleep(config.ShortcutReleaseDelay)
-	if previousClipboard.image() && !previousClipboard.empty() {
-		_ = desktop.Notify("Ask AI", "Using the current image from the clipboard.")
-		return openAndPaste(config, desktop, previousClipboard)
-	}
 
 	selectedItem, err := captureSelection(desktop, previousClipboard)
 	if err != nil {

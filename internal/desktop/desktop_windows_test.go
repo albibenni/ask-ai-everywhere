@@ -33,6 +33,13 @@ func TestWindowsDoesNotCopyOverAnUnreadableClipboard(t *testing.T) {
 	}
 }
 
+func TestWindowsSelectionAttemptPreservesScreenshotForManualPaste(t *testing.T) {
+	system := &System{clipboardImage: true}
+	if err := system.CopySelection(); err != nil {
+		t.Fatalf("image clipboard should bypass simulated Copy: %v", err)
+	}
+}
+
 func TestWindowsRejectsUnrepresentableTextBeforeChangingClipboard(t *testing.T) {
 	// Text encoding fails before any native allocation or clipboard change.
 	system := New()
